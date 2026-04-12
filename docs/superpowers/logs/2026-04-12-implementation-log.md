@@ -1,87 +1,148 @@
 # Dungeon League v1 — Implementation Log
 
+## Summary
+
+**All 22 tasks complete.** 59 tests passing. Production build succeeds. Full-stack fantasy sports league app with:
+- Deterministic sim engine + scoring + highlights
+- Snake draft with AI managers
+- 7 React Router pages with parchment aesthetic
+- Export/import for league backups
+- Balance harness for scoring iteration
+
 ## Tasks Completed
 
 ### Task 1: Project Scaffolding
-- Scaffolded React Router v7 + Prisma + Vitest project
+- Scaffolded React Router v7 + Prisma 7 + Vitest + Tailwind CSS
 - Fixed Vitest type reference in vite.config.ts
 - Commits: `4d66fdb`, `6e02367`
 
 ### Task 2: Domain Types
-- Created all domain type definitions (Character, Dungeon, SimEvent, ScoreResult, etc.)
+- All domain type definitions (Character, Dungeon, SimEvent, ScoreResult, etc.)
 - Commit: `3e53c38`
 
 ### Task 3: Seeded RNG
-- Implemented mulberry32-based deterministic PRNG with fork(), rollStat(), shuffle()
+- Mulberry32 PRNG with fork(), rollStat(), shuffle(), seedFromIds()
 - 8 tests
 - Commit: `42f6d97`
 
 ### Tasks 4-5: ContentSource + ProceduralSource
-- ContentSource interface, name tables (59 first names, 50 last names, dungeon themes, etc.)
-- ProceduralSource with character generation (unique names, rolled stats) and dungeon generation (5-8 encounters, boss finale)
+- ContentSource interface, name tables, ProceduralSource
+- Character gen (unique names, rolled stats) + dungeon gen (5-8 encounters, boss finale)
 - 10 tests
 - Commit: `f73341d`
 
 ### Task 6: Sim Engine
-- Encounter resolution functions (combat, trap, puzzle, treasure)
-- runDungeon() entry point with HP tracking, death/KO mechanics
-- Fixed healing bug from plan (used correct `c.stats.con` vs wrong `char.stats.con`)
+- Encounter resolution (combat, trap, puzzle, treasure)
+- runDungeon() with HP tracking, death/KO mechanics
+- Fixed healing bug from plan (`c.stats.con` vs `char.stats.con`)
 - 6 tests
 - Commit: `858c6e2`
 
 ### Task 7: Scoring Module
-- Pure scoring reducer with base points, role multipliers (x0.5), 6 milestone types
-- Added clutch_survivor milestone (KO'd but not killed)
-- Fixed test assertion: mvp + flawless_run stack to 8, not 5
+- Pure reducer with base points, role multipliers (x0.5), 6 milestones
+- Includes clutch_survivor (KO'd but survived)
+- Fixed test: mvp + flawless_run stack to 8, not 5
 - 9 tests
 - Commit: `8b7ded7`
 
 ### Task 8: Highlight Generator
-- Highlight generation with priority-based selection (max 10)
-- Templated descriptions with placeholder substitution
-- Updated ProceduralSource.getHighlightTemplates()
-- 6 tests
+- Priority-based selection (max 10), templated descriptions
 - Commit: `00f66bc`
 
 ### Task 9: AI Manager
-- AIManager class with personality-driven draft picks and lineup setting
-- 5 AI personalities: Iron Wall, Glass Cannon, Balanced General, Treasure Hunter, Mystic Circle
+- 5 personalities: Iron Wall, Glass Cannon, Balanced General, Treasure Hunter, Mystic Circle
+- Personality-driven draft picks + dungeon-aware lineup setting
 - 5 tests
 - Commit: `4e7657e`
 
 ### Task 10: Schedule Generator
-- Round-robin (circle method) for 6 teams, 5 weeks
-- Playoff bracket generation (semifinals + finals)
+- Round-robin (circle method) for 6 teams, playoff bracket (semis + finals)
 - 6 tests
 - Commit: `cce34ce`
 
 ### Task 11: Prisma Schema
-- Full DB schema (League, Team, Character, Lineup, Matchup)
-- Prisma client singleton, dev-mode auth stub
-- Adapted for Prisma 7 (datasource URL via prisma.config.ts)
+- Models: League, Team, Character, Lineup, Matchup
+- Prisma client singleton with PrismaPg adapter (Prisma 7)
+- Dev-mode auth stub
 - Commit: `96160dc`
 
 ### Task 12: League Service
 - createLeague: 6 teams, 48 chars, round-robin schedule
-- advanceWeek: full game loop with sim, scoring, highlights, standings, playoff generation
-- Used @prisma/adapter-pg for Prisma 7 compatibility
+- advanceWeek: full game loop (sim → score → highlights → standings → playoffs)
 - 3 integration tests
 - Commit: `94a07e3`
 
 ### Task 13: Draft Service
-- Snake draft orchestration (6 teams × 6 rounds = 36 picks)
+- Snake draft (6 teams × 6 rounds = 36 picks)
 - AI picks via AIManager with personality
-- League transitions to "regular" phase after draft completes
 - 3 integration tests
 - Commit: `e6b0716`
 
-### Infrastructure fix
-- Serialized test file execution to avoid DB contention
-- Commit: `de4e466`
+### Task 14: Root Layout + League List
+- Parchment aesthetic CSS, serif fonts, themed variables
+- League list page with empty state
+- Commit: `f325e66`
 
-## Current State
-- **60 tests passing** (54 domain unit + 6 service integration)
-- Domain core is pure TypeScript, no framework imports
-- All domain functions are deterministic and seedable
-- Postgres running in Docker at localhost:5432
-- Next: UI layer (Tasks 14-19)
+### Task 15: Create League + Draft Room
+- League creation form → redirect to draft
+- Draft room: character pool with role filters, AI "Continue" button, roster sidebar
+- CharacterCard and DraftPool components
+- Commit: `13e09d2`
+
+### Task 16: League Home + Standings
+- Standings table (W/L/PF/PA), "Advance Week" button
+- Current and past week matchup links
+- Commit: `d6c49ec`
+
+### Task 17: Team Page + Lineup Editor
+- Roster view with active (4) / bench (2) lineup
+- Swap buttons for human team, read-only for AI
+- Commit: `4594d3a`
+
+### Task 18: Matchup Page
+- Score comparison, highlights sorted by importance
+- Side-by-side play-by-play feeds and per-character stat tables
+- Commit: `f0d3556`
+
+### Task 19: Character Detail
+- Stats, description, draft team, weekly performance log
+- Commit: `1f08407`
+
+### Task 20: Export/Import
+- JSON export (full league state), import with fresh IDs
+- Download backup button on league home, import page
+- Commit: `0f3ebd5`
+
+### Task 21: Balance Harness
+- 100 leagues × 5 weeks simulation, role averages, score/margin distributions
+- Initial findings: Healers score ~50% higher than Tanks (balance iteration needed)
+- Commit: `3f6f64e`
+
+### Task 22: Final Cleanup
+- Removed smoke test, fixed Vitest deprecation warning
+- Commit: `8b9b098`
+
+## Balance Report (from harness)
+
+```
+Role Average Points Per Game:
+  Tank     6.14
+  Healer   9.10
+  DPS      6.45
+  Utility  8.10
+
+Team Score Distribution:
+  Min: -47.2, Median: 28.4, Mean: 28.4, Max: 65.9
+
+Matchup Margin Distribution:
+  Median margin: 5.7
+  Blowouts (>50% of mean score): 19.7%
+```
+
+**Known balance issues:** Healers overscored, negative team scores possible (TPK penalty too harsh?), ~20% blowout rate.
+
+## Technical Notes
+
+- **Prisma 7 adaptation:** Required `@prisma/adapter-pg` + `pg` driver. No `url` in schema datasource (moved to `prisma.config.ts`).
+- **Test serialization:** Integration tests must run sequentially (`fileParallelism: false`) to avoid DB contention.
+- **React Router v7 routing:** Uses explicit `app/routes.ts` config, not file-convention routing.
