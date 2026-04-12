@@ -2,6 +2,7 @@ import type { Character, CharacterClass, Race, Stats, Dungeon, Encounter, Encoun
 import { CLASS_ROLE_MAP } from "domain/types";
 import type { Rng } from "domain/rng";
 import type { ContentSource, HighlightTemplateBundle } from "./content-source";
+import { DEFAULT_HIGHLIGHT_TEMPLATES } from "./highlight-templates";
 import {
   FIRST_NAMES, LAST_NAMES, ADJECTIVES, ADJECTIVES_2, TRAITS, QUIRKS,
   BACKGROUNDS, DESCRIPTION_TEMPLATES, DUNGEON_PREFIXES, DUNGEON_NOUNS,
@@ -126,6 +127,6 @@ export class ProceduralSource implements ContentSource {
   }
 
   getHighlightTemplates(): HighlightTemplateBundle {
-    throw new Error("Not implemented yet — see Task 8");
+    return DEFAULT_HIGHLIGHT_TEMPLATES;
   }
 }
