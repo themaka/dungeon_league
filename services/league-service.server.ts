@@ -134,18 +134,25 @@ export async function advanceWeek(leagueId: string) {
         where: { teamId_week: { teamId: team.id, week } },
       });
 
-      if (!lineup && team.managerType === "ai") {
+      if (!lineup) {
         const teamChars = allChars.filter((c) => c.teamId === team.id);
         const rosterChars = teamChars.map((c) => charMap.get(c.externalId)!);
-        const personality = team.aiPersonality as any;
-        const ai = new AIManager(personality);
-        const aiLineup = ai.setLineup(rosterChars, dungeon, rng.fork(`lineup-${team.id}`));
-        lineup = await prisma.lineup.create({
-          data: { teamId: team.id, week, active: aiLineup.active, bench: aiLineup.bench },
-        });
-      }
 
-      if (!lineup) throw new Error(`No lineup for team ${team.id} week ${week}`);
+        if (team.managerType === "ai") {
+          const personality = team.aiPersonality as any;
+          const ai = new AIManager(personality);
+          const aiLineup = ai.setLineup(rosterChars, dungeon, rng.fork(`lineup-${team.id}`));
+          lineup = await prisma.lineup.create({
+            data: { teamId: team.id, week, active: aiLineup.active, bench: aiLineup.bench },
+          });
+        } else {
+          const active = rosterChars.slice(0, 4).map((c) => c.id);
+          const bench = rosterChars.slice(4, 6).map((c) => c.id);
+          lineup = await prisma.lineup.create({
+            data: { teamId: team.id, week, active, bench },
+          });
+        }
+      }
 
       const lineupData: Lineup = {
         active: (lineup.active as string[]) as [string, string, string, string],
