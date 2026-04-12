@@ -1,5 +1,6 @@
 import { Link, useFetcher } from "react-router";
 import { getLeague, advanceWeek } from "services/league-service.server";
+import { exportLeague } from "services/export-import.server";
 import { StandingsTable } from "~/components/standings-table";
 import type { Route } from "./+types/leagues.$id";
 
@@ -11,6 +12,16 @@ export async function loader({ params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (intent === "export") {
+    const data = await exportLeague(params.id);
+    return new Response(JSON.stringify(data, null, 2), {
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="league-${params.id}.json"`,
+      },
+    });
+  }
 
   if (intent === "advance") {
     await advanceWeek(params.id);
@@ -34,9 +45,17 @@ export default function LeagueHome({ loaderData }: Route.ComponentProps) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>{league.name}</h1>
-        <span style={{ color: "var(--ink-light)" }}>
-          {league.phase === "complete" ? "Season Complete" : `Week ${league.currentWeek} — ${league.phase}`}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <span style={{ color: "var(--ink-light)" }}>
+            {league.phase === "complete" ? "Season Complete" : `Week ${league.currentWeek} — ${league.phase}`}
+          </span>
+          <fetcher.Form method="post" style={{ display: "inline" }}>
+            <input type="hidden" name="intent" value="export" />
+            <button type="submit" className="btn" style={{ fontSize: "0.85rem", padding: "0.3rem 0.8rem" }}>
+              Download Backup
+            </button>
+          </fetcher.Form>
+        </div>
       </div>
 
       {league.phase === "draft" && (

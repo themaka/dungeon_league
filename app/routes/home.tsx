@@ -25,7 +25,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <h1>Your Leagues</h1>
-        <Link to="/leagues/new" className="btn">New League</Link>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          <Link to="/leagues/new" className="btn">New League</Link>
+          <Link to="/leagues/import" className="btn" style={{ opacity: 0.8 }}>Import</Link>
+        </div>
       </div>
 
       {leagues.length === 0 ? (
