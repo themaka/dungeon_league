@@ -1,13 +1,89 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+model League {
+  id           String    @id @default(cuid())
+  name         String
+  phase        String    @default("draft")
+  currentWeek  Int       @default(0)
+  settings     Json      @default("{}")
+  createdAt    DateTime  @default(now())
+
+  teams        Team[]
+  characters   Character[]
+  matchups     Matchup[]
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  name           String
+  leagueId       String
+  managerId      String
+  managerType    String
+  aiPersonality  Json?
+  wins           Int      @default(0)
+  losses         Int      @default(0)
+  pointsFor      Float    @default(0)
+  pointsAgainst  Float    @default(0)
+
+  league         League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  roster         Character[] @relation("TeamRoster")
+  lineups        Lineup[]
+  homeMatchups   Matchup[] @relation("HomeTeam")
+  awayMatchups   Matchup[] @relation("AwayTeam")
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  externalId  String
+  name        String
+  race        String
+  class       String
+  role        String
+  stats       Json
+  level       Int      @default(1)
+  description String
+
+  leagueId    String
+  league      League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  teamId      String?
+  team        Team?    @relation("TeamRoster", fields: [teamId], references: [id])
+
+  draftOrder  Int?
+}
+
+model Lineup {
+  id       String @id @default(cuid())
+  teamId   String
+  week     Int
+  active   Json
+  bench    Json
+
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, week])
+}
+
+model Matchup {
+  id           String  @id @default(cuid())
+  leagueId     String
+  week         Int
+  homeTeamId   String
+  awayTeamId   String
+  dungeonData  Json?
+  homeRunData  Json?
+  awayRunData  Json?
+  winnerId     String?
+
+  league       League  @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  homeTeam     Team    @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team    @relation("AwayTeam", fields: [awayTeamId], references: [id])
+
+  @@index([leagueId, week])
 }
