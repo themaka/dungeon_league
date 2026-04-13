@@ -141,6 +141,21 @@ Matchup Margin Distribution:
 
 **Known balance issues:** Healers overscored, negative team scores possible (TPK penalty too harsh?), ~20% blowout rate.
 
+## Post-Implementation Fixes (from first playtest)
+
+- **Default lineup for human teams** (`1ad303c`) — advanceWeek no longer throws if the human hasn't set a lineup; defaults to first 4 characters active.
+- **Heal target name resolution** (`64927f8`) — Highlight generator was checking encounter names before character names, so heal targets showed raw IDs. Fixed lookup order.
+- **Export download** (`64927f8`) — Moved export from fetcher action to a resource route (`/leagues/:id/export`) so the browser handles the file download.
+- **Play-by-play encounter names** (`33a887f`) — Added encounter name map so hits/kills show "Goblin Ambush" instead of "enc-w1-m0-0".
+- **Export filename** (`fc94f03`) — Download filename uses league name instead of ID.
+
+## Open Issues (from playtest)
+
+1. **Team naming** — Players can't name their team (hardcoded "Your Team")
+2. **Highlights missing team context** — No indication which team a highlighted character belongs to
+3. **Stat table missing role column** — Points breakdown shows "Role" column but not what role each character is
+4. **Save highlights lack context** — Generic "resisted the danger" instead of naming the encounter (future feature)
+
 ## Technical Notes
 
 - **Prisma 7 adaptation:** Required `@prisma/adapter-pg` + `pg` driver. No `url` in schema datasource (moved to `prisma.config.ts`).
