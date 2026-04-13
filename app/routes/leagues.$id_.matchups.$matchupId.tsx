@@ -19,11 +19,19 @@ export async function loader({ params }: Route.LoaderArgs) {
     charNames[c.externalId] = c.name;
   }
 
-  return { matchup, charNames };
+  const dungeonData = matchup.dungeonData as any;
+  const encounterNames: Record<string, string> = {};
+  if (dungeonData?.encounters) {
+    for (const enc of dungeonData.encounters) {
+      encounterNames[enc.id] = enc.name;
+    }
+  }
+
+  return { matchup, charNames, encounterNames };
 }
 
 export default function MatchupPage({ loaderData }: Route.ComponentProps) {
-  const { matchup, charNames } = loaderData;
+  const { matchup, charNames, encounterNames } = loaderData;
   const dungeon = matchup.dungeonData as any;
   const homeRun = matchup.homeRunData as any;
   const awayRun = matchup.awayRunData as any;
@@ -73,11 +81,11 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "1.5rem" }}>
         <div>
           <h2>{matchup.homeTeam.name} — Play by Play</h2>
-          <PlayByPlay events={homeRun.events ?? []} characterNames={charNames} />
+          <PlayByPlay events={homeRun.events ?? []} characterNames={charNames} encounterNames={encounterNames} />
         </div>
         <div>
           <h2>{matchup.awayTeam.name} — Play by Play</h2>
-          <PlayByPlay events={awayRun.events ?? []} characterNames={charNames} />
+          <PlayByPlay events={awayRun.events ?? []} characterNames={charNames} encounterNames={encounterNames} />
         </div>
       </div>
 

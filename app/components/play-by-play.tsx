@@ -7,10 +7,11 @@ interface PlayByPlayProps {
     encounterId: string;
   }[];
   characterNames: Record<string, string>;
+  encounterNames?: Record<string, string>;
 }
 
-export function PlayByPlay({ events, characterNames }: PlayByPlayProps) {
-  const getName = (id: string) => characterNames[id] ?? id;
+export function PlayByPlay({ events, characterNames, encounterNames = {} }: PlayByPlayProps) {
+  const getName = (id: string) => characterNames[id] ?? encounterNames[id] ?? id;
 
   return (
     <div style={{ maxHeight: 400, overflowY: "auto" }}>
