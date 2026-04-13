@@ -41,6 +41,10 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const state = await getDraftState(params.id);
   if (state.currentPick >= state.totalPicks) {
+    const humanTeam = state.teams.find((t) => t.managerType === "human");
+    if (humanTeam) {
+      return redirect(`/leagues/${params.id}/teams/${humanTeam.id}?postDraft=1`);
+    }
     return redirect(`/leagues/${params.id}`);
   }
 
