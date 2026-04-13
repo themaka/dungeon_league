@@ -15,8 +15,16 @@ export async function loader({ params }: Route.LoaderArgs) {
   });
 
   const charNames: Record<string, string> = {};
+  const charRoles: Record<string, string> = {};
+  const charTeams: Record<string, string> = {};
   for (const c of characters) {
     charNames[c.externalId] = c.name;
+    charRoles[c.externalId] = c.role;
+    if (c.teamId === matchup.homeTeamId) {
+      charTeams[c.externalId] = matchup.homeTeam.name;
+    } else if (c.teamId === matchup.awayTeamId) {
+      charTeams[c.externalId] = matchup.awayTeam.name;
+    }
   }
 
   const dungeonData = matchup.dungeonData as any;
@@ -27,11 +35,11 @@ export async function loader({ params }: Route.LoaderArgs) {
     }
   }
 
-  return { matchup, charNames, encounterNames };
+  return { matchup, charNames, charRoles, charTeams, encounterNames };
 }
 
 export default function MatchupPage({ loaderData }: Route.ComponentProps) {
-  const { matchup, charNames, encounterNames } = loaderData;
+  const { matchup, charNames, charRoles, charTeams, encounterNames } = loaderData;
   const dungeon = matchup.dungeonData as any;
   const homeRun = matchup.homeRunData as any;
   const awayRun = matchup.awayRunData as any;
@@ -41,8 +49,8 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
   }
 
   const allHighlights = [
-    ...(homeRun.highlights ?? []),
-    ...(awayRun.highlights ?? []),
+    ...(homeRun.highlights ?? []).map((h: any) => ({ ...h, _teamName: matchup.homeTeam.name })),
+    ...(awayRun.highlights ?? []).map((h: any) => ({ ...h, _teamName: matchup.awayTeam.name })),
   ].sort((a: any, b: any) => {
     const imp = { high: 3, medium: 2, low: 1 };
     return (imp[b.importance as keyof typeof imp] ?? 0) - (imp[a.importance as keyof typeof imp] ?? 0);
@@ -75,7 +83,7 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
 
       <h2>Highlights</h2>
       {allHighlights.map((h: any, i: number) => (
-        <HighlightCard key={i} highlight={h} />
+        <HighlightCard key={i} highlight={h} teamName={h._teamName} />
       ))}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "1.5rem" }}>
@@ -94,12 +102,13 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
           <h2>{matchup.homeTeam.name} — Character Stats</h2>
           <table>
             <thead>
-              <tr><th>Character</th><th>Base</th><th>Role</th><th>Milestone</th><th>Total</th></tr>
+              <tr><th>Character</th><th>Role</th><th>Base</th><th>Role Pts</th><th>Milestone</th><th>Total</th></tr>
             </thead>
             <tbody>
               {Object.entries(homeRun.score?.perCharacter ?? {}).map(([id, cs]: any) => (
                 <tr key={id}>
                   <td>{charNames[cs.characterId] ?? cs.characterId}</td>
+                  <td><span className={`badge badge-${(charRoles[cs.characterId] ?? "dps").toLowerCase()}`}>{charRoles[cs.characterId] ?? "?"}</span></td>
                   <td>{cs.basePoints?.toFixed(1)}</td>
                   <td>{cs.roleMultiplierPoints?.toFixed(1)}</td>
                   <td>{cs.milestonePoints?.toFixed(1)}</td>
@@ -113,12 +122,13 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
           <h2>{matchup.awayTeam.name} — Character Stats</h2>
           <table>
             <thead>
-              <tr><th>Character</th><th>Base</th><th>Role</th><th>Milestone</th><th>Total</th></tr>
+              <tr><th>Character</th><th>Role</th><th>Base</th><th>Role Pts</th><th>Milestone</th><th>Total</th></tr>
             </thead>
             <tbody>
               {Object.entries(awayRun.score?.perCharacter ?? {}).map(([id, cs]: any) => (
                 <tr key={id}>
                   <td>{charNames[cs.characterId] ?? cs.characterId}</td>
+                  <td><span className={`badge badge-${(charRoles[cs.characterId] ?? "dps").toLowerCase()}`}>{charRoles[cs.characterId] ?? "?"}</span></td>
                   <td>{cs.basePoints?.toFixed(1)}</td>
                   <td>{cs.roleMultiplierPoints?.toFixed(1)}</td>
                   <td>{cs.milestonePoints?.toFixed(1)}</td>

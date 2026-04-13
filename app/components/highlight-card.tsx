@@ -5,9 +5,10 @@ interface HighlightCardProps {
     description: string;
     importance: "high" | "medium" | "low";
   };
+  teamName?: string;
 }
 
-export function HighlightCard({ highlight }: HighlightCardProps) {
+export function HighlightCard({ highlight, teamName }: HighlightCardProps) {
   const borderColor = highlight.importance === "high"
     ? "var(--accent)"
     : highlight.importance === "medium"
@@ -24,9 +25,16 @@ export function HighlightCard({ highlight }: HighlightCardProps) {
       }}
     >
       <p>{highlight.description}</p>
-      <span style={{ fontSize: "0.75rem", color: "var(--ink-light)", textTransform: "uppercase" }}>
-        {highlight.kind.replace("_", " ")}
-      </span>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.25rem" }}>
+        <span style={{ fontSize: "0.75rem", color: "var(--ink-light)", textTransform: "uppercase" }}>
+          {highlight.kind.replace("_", " ")}
+        </span>
+        {teamName && (
+          <span style={{ fontSize: "0.75rem", color: "var(--ink-light)" }}>
+            — {teamName}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

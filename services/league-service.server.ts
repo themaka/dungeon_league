@@ -19,7 +19,7 @@ const AI_TEAM_NAMES = [
   "Wild Hunt", "Crimson Vanguard",
 ];
 
-export async function createLeague(name: string, userId: string) {
+export async function createLeague(name: string, userId: string, teamName?: string) {
   const leagueId = crypto.randomUUID();
   const rng = createRng(seedFromIds(leagueId, "init"));
   const characters = contentSource.generateCharacters(48, rng);
@@ -50,7 +50,7 @@ export async function createLeague(name: string, userId: string) {
 
   const humanTeam = await prisma.team.create({
     data: {
-      name: "Your Team",
+      name: teamName?.trim() || "Your Team",
       leagueId: league.id,
       managerId: userId,
       managerType: "human",
