@@ -83,7 +83,7 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
 
       <h2>Highlights</h2>
       {allHighlights.map((h: any, i: number) => (
-        <HighlightCard key={i} highlight={h} teamName={h._teamName} />
+        <HighlightCard key={i} highlight={h} teamName={h._teamName} characterNames={charNames} characterRoles={charRoles} />
       ))}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "1.5rem" }}>
