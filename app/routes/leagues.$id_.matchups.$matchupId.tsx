@@ -89,11 +89,11 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginTop: "1.5rem" }}>
         <div>
           <h2>{matchup.homeTeam.name} — Play by Play</h2>
-          <PlayByPlay events={homeRun.events ?? []} characterNames={charNames} encounterNames={encounterNames} />
+          <PlayByPlay events={homeRun.events ?? []} characterNames={charNames} characterRoles={charRoles} encounterNames={encounterNames} />
         </div>
         <div>
           <h2>{matchup.awayTeam.name} — Play by Play</h2>
-          <PlayByPlay events={awayRun.events ?? []} characterNames={charNames} encounterNames={encounterNames} />
+          <PlayByPlay events={awayRun.events ?? []} characterNames={charNames} characterRoles={charRoles} encounterNames={encounterNames} />
         </div>
       </div>
 
@@ -107,7 +107,7 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
             <tbody>
               {Object.entries(homeRun.score?.perCharacter ?? {}).map(([id, cs]: any) => (
                 <tr key={id}>
-                  <td>{charNames[cs.characterId] ?? cs.characterId}</td>
+                  <td style={{ color: {"Tank":"#4a6fa5","Healer":"#2e8b57","DPS":"#b8860b","Utility":"#7b68ee"}[charRoles[cs.characterId]] ?? "var(--ink)" }}>{charNames[cs.characterId] ?? cs.characterId}</td>
                   <td><span className={`badge badge-${(charRoles[cs.characterId] ?? "dps").toLowerCase()}`}>{charRoles[cs.characterId] ?? "?"}</span></td>
                   <td>{cs.basePoints?.toFixed(1)}</td>
                   <td>{cs.roleMultiplierPoints?.toFixed(1)}</td>
@@ -127,7 +127,7 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
             <tbody>
               {Object.entries(awayRun.score?.perCharacter ?? {}).map(([id, cs]: any) => (
                 <tr key={id}>
-                  <td>{charNames[cs.characterId] ?? cs.characterId}</td>
+                  <td style={{ color: {"Tank":"#4a6fa5","Healer":"#2e8b57","DPS":"#b8860b","Utility":"#7b68ee"}[charRoles[cs.characterId]] ?? "var(--ink)" }}>{charNames[cs.characterId] ?? cs.characterId}</td>
                   <td><span className={`badge badge-${(charRoles[cs.characterId] ?? "dps").toLowerCase()}`}>{charRoles[cs.characterId] ?? "?"}</span></td>
                   <td>{cs.basePoints?.toFixed(1)}</td>
                   <td>{cs.roleMultiplierPoints?.toFixed(1)}</td>
