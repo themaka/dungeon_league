@@ -242,6 +242,14 @@ export async function advanceWeek(leagueId: string) {
         data: { leagueId, week: settings.seasonWeeks + 1, homeTeamId: m.home, awayTeamId: m.away },
       });
     }
+
+    // Consolation matchup for eliminated teams (5th vs 6th)
+    const eliminated = rankedIds.slice(4);
+    if (eliminated.length === 2) {
+      await prisma.matchup.create({
+        data: { leagueId, week: settings.seasonWeeks + 1, homeTeamId: eliminated[0], awayTeamId: eliminated[1] },
+      });
+    }
   }
 
   if (week === settings.seasonWeeks + 1 && newPhase === "playoffs") {
@@ -251,12 +259,37 @@ export async function advanceWeek(leagueId: string) {
     const winnerIds = semiMatchups
       .filter((m) => m.winnerId)
       .map((m) => m.winnerId!);
+
+    // Identify semifinal losers for consolation
+    const semiTeamIds = semiMatchups.flatMap((m) => [m.homeTeamId, m.awayTeamId]);
+    const semiLoserIds = semiTeamIds.filter((id) => !winnerIds.includes(id));
+
     if (winnerIds.length === 2) {
       const { generatePlayoffMatchups } = await import("domain/schedule");
       const finals = generatePlayoffMatchups(winnerIds, "final");
       for (const m of finals) {
         await prisma.matchup.create({
           data: { leagueId, week: settings.seasonWeeks + 2, homeTeamId: m.home, awayTeamId: m.away },
+        });
+      }
+
+      // Consolation: semi losers play for 3rd place
+      if (semiLoserIds.length === 2) {
+        await prisma.matchup.create({
+          data: { leagueId, week: settings.seasonWeeks + 2, homeTeamId: semiLoserIds[0], awayTeamId: semiLoserIds[1] },
+        });
+      }
+
+      // Consolation: 5th vs 6th play again in finals week too
+      const allTeams = await prisma.team.findMany({
+        where: { leagueId },
+        orderBy: [{ wins: "desc" }, { pointsFor: "desc" }],
+      });
+      const finalsTeamIds = new Set([...winnerIds, ...semiLoserIds]);
+      const bottomTeams = allTeams.filter((t) => !finalsTeamIds.has(t.id));
+      if (bottomTeams.length === 2) {
+        await prisma.matchup.create({
+          data: { leagueId, week: settings.seasonWeeks + 2, homeTeamId: bottomTeams[0].id, awayTeamId: bottomTeams[1].id },
         });
       }
     }

@@ -78,6 +78,7 @@ export default function DraftRoom({ loaderData }: Route.ComponentProps) {
           <h2>Available Characters ({data.available.length})</h2>
           {data.isMyTurn ? (
             <DraftPool
+              leagueId={data.leagueId}
               characters={data.available}
               onPick={handlePick}
               isMyTurn={true}

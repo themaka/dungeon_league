@@ -1,14 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CharacterCard } from "./character-card";
 
 interface DraftPoolProps {
+  leagueId?: string;
   characters: any[];
   onPick: (charId: string) => void;
   isMyTurn: boolean;
 }
 
-export function DraftPool({ characters, onPick, isMyTurn }: DraftPoolProps) {
-  const [roleFilter, setRoleFilter] = useState<string>("all");
+export function DraftPool({ leagueId, characters, onPick, isMyTurn }: DraftPoolProps) {
+  const storageKey = leagueId ? `league:${leagueId}:draft:roleFilter` : null;
+
+  const [roleFilter, setRoleFilter] = useState<string>(() => {
+    if (typeof window === "undefined" || !storageKey) return "all";
+    return localStorage.getItem(storageKey) ?? "all";
+  });
+
+  useEffect(() => {
+    if (storageKey) {
+      localStorage.setItem(storageKey, roleFilter);
+    }
+  }, [roleFilter, storageKey]);
 
   const filtered = roleFilter === "all"
     ? characters
