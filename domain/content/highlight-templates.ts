@@ -10,34 +10,34 @@ export const DEFAULT_HIGHLIGHT_TEMPLATES: HighlightTemplateBundle = {
     "{actor} delivered the killing blow to {target}.",
   ],
   crit: [
-    "{actor} scored a devastating critical hit for {amount} damage!",
-    "Critical strike! {actor} unleashed {amount} damage!",
+    "{actor} scored a devastating critical hit for {amount} damage during the {encounter}!",
+    "Critical strike! {actor} unleashed {amount} damage in the {encounter}!",
   ],
   heal: [
-    "{actor} healed {target} for {amount} HP.",
+    "{actor} healed {target} for {amount} HP during the {encounter}.",
     "{actor} mended {target}'s wounds, restoring {amount} HP.",
   ],
   ko: [
-    "{actor} was knocked unconscious!",
-    "{actor} collapsed, overwhelmed by the onslaught.",
+    "{actor} was knocked unconscious by the {encounter}!",
+    "{actor} collapsed during the {encounter}!",
   ],
   death: [
-    "{actor} has fallen! They will not continue this dungeon.",
-    "{actor} met their end in the darkness.",
+    "{actor} has fallen to the {encounter}! They will not continue this dungeon.",
+    "{actor} met their end in the {encounter}.",
   ],
   disarm_trap: [
-    "{actor} deftly disarmed the trap!",
-    "{actor} spotted the danger and neutralized it.",
+    "{actor} deftly disarmed the {encounter}!",
+    "{actor} spotted the {encounter} and neutralized it.",
   ],
   find_treasure: [
-    "{actor} discovered hidden treasure!",
+    "{actor} discovered hidden treasure in the {encounter}!",
     "{actor} unearthed a valuable cache!",
   ],
   save_pass: [
-    "{actor} resisted the danger with ease.",
+    "{actor} resisted the {encounter} with ease.",
   ],
   save_fail: [
-    "{actor} failed to avoid the hazard.",
+    "{actor} failed to resist the {encounter}.",
   ],
   milestone: {
     mvp_of_run: ["{actor} was the Most Valuable Player of the run!"],

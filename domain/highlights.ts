@@ -41,10 +41,12 @@ export function generateHighlights(
     const targetName = event.targetId
       ? resolveTargetName(event.targetId, roster, dungeon)
       : "";
+    const encounterName = findEncounterName(dungeon, event.encounterId) ?? event.encounterId;
     const vars = {
       actor: actorName,
       target: targetName,
       amount: String(event.amount ?? 0),
+      encounter: encounterName,
     };
 
     switch (event.kind) {
