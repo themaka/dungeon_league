@@ -3,12 +3,16 @@ import { DEFAULT_HIGHLIGHT_TEMPLATES } from "./content/highlight-templates";
 
 const MAX_HIGHLIGHTS = 10;
 
-function findCharName(chars: Character[], id: string): string {
-  return chars.find((c) => c.id === id)?.name ?? id;
+function findCharName(chars: Character[], id: string): string | undefined {
+  return chars.find((c) => c.id === id)?.name;
 }
 
-function findEncounterName(dungeon: Dungeon, encounterId: string): string {
-  return dungeon.encounters.find((e) => e.id === encounterId)?.name ?? encounterId;
+function findEncounterName(dungeon: Dungeon, encounterId: string): string | undefined {
+  return dungeon.encounters.find((e) => e.id === encounterId)?.name;
+}
+
+function resolveTargetName(id: string, roster: Character[], dungeon: Dungeon): string {
+  return findCharName(roster, id) ?? findEncounterName(dungeon, id) ?? id;
 }
 
 function fillTemplate(template: string, vars: Record<string, string>): string {
@@ -33,9 +37,9 @@ export function generateHighlights(
   const candidates: HighlightCandidate[] = [];
 
   for (const event of events) {
-    const actorName = findCharName(roster, event.actorId);
+    const actorName = findCharName(roster, event.actorId) ?? event.actorId;
     const targetName = event.targetId
-      ? findEncounterName(dungeon, event.targetId) || findCharName(roster, event.targetId)
+      ? resolveTargetName(event.targetId, roster, dungeon)
       : "";
     const vars = {
       actor: actorName,
