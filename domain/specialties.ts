@@ -76,6 +76,21 @@ export const CLASS_SPECIALTY_MAP: Record<CharacterClass, [Specialty, Specialty]>
 
 const SPECIALTY_INDEX = new Map(SPECIALTIES.map((s) => [s.name, s]));
 
+// Self-check at module load: SPECIALTIES and CLASS_SPECIALTY_MAP must agree.
+((): void => {
+  for (const cls of Object.keys(CLASS_SPECIALTY_MAP) as CharacterClass[]) {
+    const [s0, s1] = CLASS_SPECIALTY_MAP[cls];
+    const def0 = SPECIALTY_INDEX.get(s0);
+    const def1 = SPECIALTY_INDEX.get(s1);
+    if (!def0 || !def1) {
+      throw new Error(`CLASS_SPECIALTY_MAP references unknown specialty for ${cls}`);
+    }
+    if (def0.className !== cls || def1.className !== cls) {
+      throw new Error(`CLASS_SPECIALTY_MAP / SPECIALTIES mismatch for ${cls}`);
+    }
+  }
+})();
+
 export function specialtyDef(name: Specialty): SpecialtyDef {
   const def = SPECIALTY_INDEX.get(name);
   if (!def) throw new Error(`Unknown specialty: ${name}`);

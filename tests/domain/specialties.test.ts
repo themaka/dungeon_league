@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   SPECIALTIES,
   CLASS_SPECIALTY_MAP,
+  specialtyDef,
   specialtyForClass,
   primaryStatForSpecialty,
   isCoreEventForSpecialty,
@@ -44,5 +45,9 @@ describe("specialties", () => {
     expect(isCoreEventForSpecialty("Life Domain", "revivify")).toBe(true);
     expect(isCoreEventForSpecialty("War Domain", "buff")).toBe(true);
     expect(isCoreEventForSpecialty("Devotion", "save_pass")).toBe(true);
+  });
+
+  it("specialtyDef throws for an unknown specialty", () => {
+    expect(() => specialtyDef("Nope" as any)).toThrow("Unknown specialty");
   });
 });
