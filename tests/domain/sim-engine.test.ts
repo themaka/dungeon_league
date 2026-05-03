@@ -69,6 +69,7 @@ describe("sim engine", () => {
       "multiattack", "sneak_attack", "smite", "rage", "block", "taunt",
       "persuade", "deceive", "intimidate",
       "arcane_surge", "dispel", "channel",
+      "buff", "buff_proc",
     ]);
     for (const event of events) {
       expect(validKinds.has(event.kind)).toBe(true);
@@ -191,5 +192,60 @@ describe("class-aware combat", () => {
       if (events.some((e) => e.kind === "crit" && e.actorId === "c")) sawCrit = true;
     }
     expect(sawCrit).toBe(true);
+  });
+});
+
+describe("buff generation", () => {
+  it("War Domain Cleric generates buff events for party", () => {
+    const c: Character = {
+      id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
+      specialty: "War Domain",
+      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 14 },
+      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+    };
+    const ally: Character = {
+      ...c, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
+      stats: { str: 16, dex: 12, con: 14, int: 8, wis: 10, cha: 8 },
+    };
+    const charMap = new Map([c, ally].map((ch) => [ch.id, ch]));
+    const lineup: Lineup = { active: [c.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
+    const dungeon: Dungeon = {
+      id: "d", name: "T", theme: "fire",
+      encounters: [{
+        id: "e1", type: "combat", name: "Foe", difficulty: 4,
+        targetStats: ["str"], isBoss: false,
+      }],
+    };
+    const events = runDungeon(lineup, charMap, dungeon, createRng(5));
+    expect(events.some((e) => e.kind === "buff" && e.actorId === "c")).toBe(true);
+  });
+
+  it("buff_proc credits buffer when buffed ally save_passes", () => {
+    const c: Character = {
+      id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
+      specialty: "War Domain",
+      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 14 },
+      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+    };
+    const ally: Character = {
+      ...c, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
+      stats: { str: 16, dex: 12, con: 14, int: 14, wis: 14, cha: 8 },
+    };
+    const charMap = new Map([c, ally].map((ch) => [ch.id, ch]));
+    const lineup: Lineup = { active: [c.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
+    const dungeon: Dungeon = {
+      id: "d", name: "T", theme: "mechanical",
+      encounters: [
+        { id: "e1", type: "combat", name: "Foe", difficulty: 2, targetStats: ["str"], isBoss: false },
+        { id: "e2", type: "trap", name: "Trap", difficulty: 1, targetStats: ["dex"], isBoss: false },
+        { id: "e3", type: "trap", name: "Trap", difficulty: 1, targetStats: ["dex"], isBoss: false },
+      ],
+    };
+    let sawProc = false;
+    for (let s = 0; s < 80 && !sawProc; s++) {
+      const events = runDungeon(lineup, charMap, dungeon, createRng(s));
+      if (events.some((e) => e.kind === "buff_proc" && e.actorId === "c")) sawProc = true;
+    }
+    expect(sawProc).toBe(true);
   });
 });

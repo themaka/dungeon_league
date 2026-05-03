@@ -4,7 +4,8 @@ import {
   attackStatFor, critRangeFor, multiattackCount,
   hasSneakAttack, hasSmite, hasRage,
 } from "./abilities-runtime";
-import type { BuffState } from "./buffs";
+import { addBuff, consumeBuff } from "./buffs";
+import type { BuffKind, BuffState } from "./buffs";
 
 function statMod(value: number): number {
   return Math.floor((value - 10) / 2);
@@ -22,13 +23,75 @@ interface EncounterCtx {
   buffs: BuffState;
 }
 
+function buffsForSpecialty(char: Character): { kind: BuffKind; charges: number; bonus: number }[] {
+  if (char.specialty === "War Domain") return [{ kind: "bless", charges: 3, bonus: 4 }];
+  if (char.specialty === "Lore") return [{ kind: "inspiration", charges: 1, bonus: 6 }];
+  if (char.specialty === "Devotion" && char.level >= 6) return [{ kind: "aura", charges: 99, bonus: 2 }];
+  if (char.specialty === "Shepherd") return [{ kind: "guidance", charges: 1, bonus: 4 }];
+  return [];
+}
+
+function pickBuffTarget(
+  source: Character,
+  chars: Character[],
+  ctx: EncounterCtx,
+): Character | undefined {
+  const others = chars.filter((c) => c.id !== source.id && (ctx.hp.get(c.id) ?? 0) > 0);
+  if (others.length === 0) return undefined;
+  return ctx.rng.pick(others);
+}
+
+function recordBuffersForEncounter(
+  chars: Character[],
+  encounter: Encounter,
+  ctx: EncounterCtx,
+): SimEvent[] {
+  const events: SimEvent[] = [];
+  for (const char of chars) {
+    if ((ctx.hp.get(char.id) ?? 0) <= 0) continue;
+    const buffs = buffsForSpecialty(char);
+    for (const buff of buffs) {
+      const target = pickBuffTarget(char, chars, ctx);
+      if (!target) continue;
+      addBuff(ctx.buffs, {
+        kind: buff.kind,
+        sourceId: char.id,
+        targetId: target.id,
+        charges: buff.charges,
+        bonus: buff.bonus,
+      });
+      events.push({
+        kind: "buff", encounterId: encounter.id, actorId: char.id, targetId: target.id,
+        meta: { buffKind: buff.kind },
+      });
+    }
+  }
+  return events;
+}
+
+function tryBuffProc(
+  char: Character,
+  encounterId: string,
+  ctx: EncounterCtx,
+): SimEvent | undefined {
+  const consumed = consumeBuff(ctx.buffs, char.id, "bless")
+    ?? consumeBuff(ctx.buffs, char.id, "inspiration")
+    ?? consumeBuff(ctx.buffs, char.id, "aura")
+    ?? consumeBuff(ctx.buffs, char.id, "guidance");
+  if (!consumed) return undefined;
+  if ((ctx.hp.get(consumed.sourceId) ?? 0) <= 0) return undefined;
+  return {
+    kind: "buff_proc", encounterId, actorId: consumed.sourceId, targetId: char.id,
+  };
+}
+
 export function resolveCombat(
   chars: Character[],
   encounter: Encounter,
   ctx: EncounterCtx,
 ): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
 
   for (const char of chars) {
     if ((hp.get(char.id) ?? 0) <= 0) continue;
@@ -54,6 +117,8 @@ export function resolveCombat(
       if (isCrit) {
         events.push({ kind: "crit", encounterId: encounter.id, actorId: char.id, amount: damage });
       }
+      const proc = tryBuffProc(char, encounter.id, ctx);
+      if (proc) events.push(proc);
     }
 
     if (extraAttacks > 0) {
@@ -152,7 +217,7 @@ export function resolveCombat(
 
 export function resolveTrap(chars: Character[], encounter: Encounter, ctx: EncounterCtx): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
 
   const utilityChar = chars.find((c) => c.role === "Utility" && (hp.get(c.id) ?? 0) > 0);
   if (utilityChar && statCheck(utilityChar, encounter.targetStats, encounter.difficulty, rng)) {
@@ -164,6 +229,8 @@ export function resolveTrap(chars: Character[], encounter: Encounter, ctx: Encou
     if ((hp.get(char.id) ?? 0) <= 0) continue;
     if (statCheck(char, encounter.targetStats, encounter.difficulty, rng)) {
       events.push({ kind: "save_pass", encounterId: encounter.id, actorId: char.id });
+      const proc = tryBuffProc(char, encounter.id, ctx);
+      if (proc) events.push(proc);
     } else {
       events.push({ kind: "save_fail", encounterId: encounter.id, actorId: char.id });
       const dmg = rng.nextInt(2, 8);
@@ -183,11 +250,13 @@ export function resolveTrap(chars: Character[], encounter: Encounter, ctx: Encou
 
 export function resolvePuzzle(chars: Character[], encounter: Encounter, ctx: EncounterCtx): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
   for (const char of chars) {
     if ((hp.get(char.id) ?? 0) <= 0) continue;
     if (statCheck(char, encounter.targetStats, encounter.difficulty, rng)) {
       events.push({ kind: "save_pass", encounterId: encounter.id, actorId: char.id });
+      const proc = tryBuffProc(char, encounter.id, ctx);
+      if (proc) events.push(proc);
     } else {
       events.push({ kind: "save_fail", encounterId: encounter.id, actorId: char.id });
     }
@@ -197,17 +266,19 @@ export function resolvePuzzle(chars: Character[], encounter: Encounter, ctx: Enc
 
 export function resolveTreasure(chars: Character[], encounter: Encounter, ctx: EncounterCtx): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
   const aliveChars = chars.filter((c) => (hp.get(c.id) ?? 0) > 0);
   if (aliveChars.length === 0) return events;
   const finder = rng.pick(aliveChars);
   events.push({ kind: "find_treasure", encounterId: encounter.id, actorId: finder.id });
+  const proc = tryBuffProc(finder, encounter.id, ctx);
+  if (proc) events.push(proc);
   return events;
 }
 
 export function resolveSocial(chars: Character[], encounter: Encounter, ctx: EncounterCtx): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
   for (const char of chars) {
     if ((hp.get(char.id) ?? 0) <= 0) continue;
     const success = statCheck(char, encounter.targetStats, encounter.difficulty, rng);
@@ -217,6 +288,8 @@ export function resolveSocial(chars: Character[], encounter: Encounter, ctx: Enc
     else kind = "intimidate";
     if (success) {
       events.push({ kind, encounterId: encounter.id, actorId: char.id });
+      const proc = tryBuffProc(char, encounter.id, ctx);
+      if (proc) events.push(proc);
     } else {
       events.push({ kind: "save_fail", encounterId: encounter.id, actorId: char.id });
     }
@@ -226,7 +299,7 @@ export function resolveSocial(chars: Character[], encounter: Encounter, ctx: Enc
 
 export function resolveArcane(chars: Character[], encounter: Encounter, ctx: EncounterCtx): SimEvent[] {
   const { rng, hp } = ctx;
-  const events: SimEvent[] = [];
+  const events: SimEvent[] = [...recordBuffersForEncounter(chars, encounter, ctx)];
   const casterClasses = new Set(["Wizard", "Sorcerer", "Warlock", "Druid", "Cleric", "Bard"]);
 
   for (const char of chars) {
@@ -245,8 +318,12 @@ export function resolveArcane(chars: Character[], encounter: Encounter, ctx: Enc
         } else {
           events.push({ kind: "channel", encounterId: encounter.id, actorId: char.id });
         }
+        const proc = tryBuffProc(char, encounter.id, ctx);
+        if (proc) events.push(proc);
       } else {
         events.push({ kind: "save_pass", encounterId: encounter.id, actorId: char.id });
+        const proc = tryBuffProc(char, encounter.id, ctx);
+        if (proc) events.push(proc);
       }
     } else {
       events.push({ kind: "save_fail", encounterId: encounter.id, actorId: char.id });
