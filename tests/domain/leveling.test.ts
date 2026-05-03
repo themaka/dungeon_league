@@ -90,4 +90,33 @@ describe("leveling", () => {
     const scaled = scaledThresholds(0.5);
     expect(scaled[3]).toBeCloseTo(15, 4);
   });
+
+  it("applyXpAndLevel handles multi-level-up in one call", () => {
+    const c = mkChar({ level: 3, xp: 0, abilityTiers: [1] });
+    const result = applyXpAndLevel(c, 200, 1, 20);
+    // 0 -> 200; thresholds 50 (L4), 70 (L5), 95 (L6), 120 (L7), 150 (L8), 185 (L9) all passable
+    expect(result.character.level).toBe(9);
+    expect(result.levelUps).toEqual([4, 5, 6, 7, 8, 9]);
+    expect(result.character.abilityTiers).toContain(2);
+  });
+
+  it("applyXpAndLevel respects scaleFactor (2x means harder to level)", () => {
+    const c = mkChar({ level: 3, xp: 30, abilityTiers: [1] });
+    // L4 normally needs 50; with 2x scale it needs 100. Awarding 50 should NOT level up.
+    const result = applyXpAndLevel(c, 50, 2, 20);
+    expect(result.character.level).toBe(3);
+    expect(result.character.xp).toBe(80);
+    expect(result.levelUps).toEqual([]);
+  });
+
+  it("xpFromEvents returns an integer (no fractional accumulation)", () => {
+    const c = mkChar({ specialty: "Life Domain" });
+    const events: SimEvent[] = [
+      { kind: "heal", encounterId: "e", actorId: "c1", amount: 5 },
+      { kind: "heal", encounterId: "e", actorId: "c1", amount: 5 },
+      { kind: "heal", encounterId: "e", actorId: "c1", amount: 5 },
+    ];
+    const xp = xpFromEvents(c, events);
+    expect(Number.isInteger(xp)).toBe(true);
+  });
 });

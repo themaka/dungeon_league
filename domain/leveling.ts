@@ -71,7 +71,7 @@ export function xpFromEvents(character: Character, events: SimEvent[]): number {
     if (!roleSet.has(event.kind)) continue;
     let amount = xpAmountForEvent(event);
     if (isCoreEventForSpecialty(character.specialty, event.kind)) {
-      amount *= SPECIALTY_XP_BONUS;
+      amount = Math.round(amount * SPECIALTY_XP_BONUS);
     }
     total += amount;
   }
@@ -91,11 +91,18 @@ export interface LevelUpResult {
   levelUps: number[];
 }
 
-// Levels that give an extra stat point from scaling (every ~3 levels for power spikes)
-const SCALING_LEVELS = new Set([4, 7, 10, 16, 19]);
-
-// Levels that give a regular stat bump (not purely ability-unlock levels, no overlap with SCALING_LEVELS)
+/**
+ * Levels at which the character receives a +1 stat bump from regular leveling.
+ * MUST match procedural-source.ts statBumpsForLevel — starting stats for
+ * characters generated above level 3 are derived using these same sets.
+ */
 const STAT_BUMP_LEVELS = new Set([2, 5, 8, 11, 14, 17]);
+
+/**
+ * Levels at which the character's specialty mechanic improves AND receives a
+ * +1 primary stat bump. Disjoint from STAT_BUMP_LEVELS.
+ */
+const SCALING_LEVELS = new Set([4, 7, 10, 16, 19]);
 
 export function applyXpAndLevel(
   character: Character,
