@@ -27,6 +27,7 @@ export function unlockTierForLevel(level: number): number {
 const ABILITIES: Ability[] = [
   { name: "Second Wind", tier: 1, className: "Fighter", description: "Self-heal once per encounter" },
   { name: "Improved Critical", tier: 1, className: "Fighter", specialty: "Champion", description: "Crit on 19-20" },
+  { name: "Maneuvers", tier: 1, className: "Fighter", specialty: "Battle Master", description: "Tactical strikes (precision/trip/disarm)" },
   { name: "Action Surge", tier: 2, className: "Fighter", description: "Extra attack 1/encounter" },
   { name: "Multiattack", tier: 2, className: "Fighter", description: "Two attacks per turn" },
   { name: "Indomitable", tier: 3, className: "Fighter", description: "Reroll a failed save" },
@@ -41,6 +42,7 @@ const ABILITIES: Ability[] = [
   { name: "Meteor Swarm", tier: 5, className: "Wizard", description: "Massive AoE finisher" },
 
   { name: "Sneak Attack", tier: 1, className: "Rogue", description: "Bonus damage from stealth" },
+  { name: "Fast Hands", tier: 1, className: "Rogue", specialty: "Thief", description: "Bonus disarm/find action" },
   { name: "Cunning Action", tier: 2, className: "Rogue", description: "Bonus dash/disengage" },
   { name: "Uncanny Dodge", tier: 3, className: "Rogue", description: "Halve incoming damage" },
   { name: "Death Strike", tier: 4, className: "Rogue", specialty: "Assassin", description: "Double damage on surprise" },
@@ -78,6 +80,7 @@ const ABILITIES: Ability[] = [
   { name: "Vicious Mockery", tier: 1, className: "Bard", description: "Low damage + debuff" },
   { name: "Bardic Inspiration", tier: 1, className: "Bard", specialty: "Lore", description: "Buff ally rolls" },
   { name: "Cutting Words", tier: 2, className: "Bard", specialty: "Lore", description: "Reduce enemy roll" },
+  { name: "Blade Flourish", tier: 2, className: "Bard", specialty: "Swords", description: "Combat flourish on attack" },
   { name: "Countercharm", tier: 3, className: "Bard", description: "Party charm protection" },
   { name: "Magical Secrets", tier: 4, className: "Bard", description: "Steal a spell" },
   { name: "Superior Inspiration", tier: 5, className: "Bard", description: "Recharge inspiration on init" },
@@ -97,6 +100,7 @@ const ABILITIES: Ability[] = [
   { name: "Mystic Arcanum", tier: 4, className: "Warlock", description: "Big spell" },
   { name: "Eldritch Master", tier: 5, className: "Warlock", description: "Recharge slot" },
 
+  { name: "Martial Arts", tier: 1, className: "Monk", description: "Bonus unarmed strike, dex-based weapons" },
   { name: "Flurry of Blows", tier: 1, className: "Monk", specialty: "Open Hand", description: "Multi-hit strike" },
   { name: "Stunning Strike", tier: 2, className: "Monk", description: "Stun target" },
   { name: "Shadow Step", tier: 2, className: "Monk", specialty: "Shadow", description: "Teleport in dark" },

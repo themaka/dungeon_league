@@ -35,4 +35,16 @@ describe("abilities", () => {
     expect(abs.length).toBeGreaterThanOrEqual(2);
     expect(abs.every((a) => a.tier <= 2)).toBe(true);
   });
+
+  it("Battle Master, Thief, Swords specialties each have a specialty-gated ability", () => {
+    expect(abilitiesForCharacter("Fighter", "Battle Master", 3).some((a) => a.specialty === "Battle Master")).toBe(true);
+    expect(abilitiesForCharacter("Rogue", "Thief", 3).some((a) => a.specialty === "Thief")).toBe(true);
+    expect(abilitiesForCharacter("Bard", "Swords", 6).some((a) => a.specialty === "Swords")).toBe(true);
+  });
+
+  it("Shadow Monk has at least one ability at tier 1 (class-wide)", () => {
+    const abs = abilitiesForCharacter("Monk", "Shadow", 3);
+    expect(abs.length).toBeGreaterThanOrEqual(1);
+    expect(abs.some((a) => a.specialty === undefined)).toBe(true);
+  });
 });
