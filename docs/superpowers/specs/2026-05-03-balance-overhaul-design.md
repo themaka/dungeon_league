@@ -1,7 +1,7 @@
 # Dungeon League — Balance & Mechanics Overhaul Design
 
 **Date:** 2026-05-03
-**Status:** In progress (brainstorming)
+**Status:** Complete (pending user review)
 
 ## Overview
 
@@ -28,8 +28,8 @@ A balance/mechanics overhaul that brings 5.5e SRD flavor to the sim while keepin
 - Role stays fixed per class (Cleric = Healer). Specialty adds individual flavor *within* the role.
 - Characters start at **level 3** with tier 1 ability already unlocked (from scouting phase).
 - Death penalty is just missed XP (no additional punishment). Revivify can bring characters back mid-run.
-- Revivify uses a **charge system** -- builds up charges over weeks played (e.g., one charge per 3 weeks at high enough level). Creates strategic choice of when to spend.
-- Scouting runs default to **3-5** (high variance, gut-feel drafting). Configurable up to 10-20 for "veterans league" style.
+- Revivify uses a **charge system** -- unlocked at Life Domain tier 2 (level 6), gains one charge per 3 weeks played after unlock. Creates strategic choice of when to spend.
+- Scouting runs default to **5** (moderate variance, gut-feel drafting). Configurable up to 20 for "veterans league" style.
 - Season length configurable via league settings. XP curve targets level 12-13 for a character playing every week of the default season.
 - Multiple draft formats supported by scouting data: snake (default), auction (budget + bidding using projected values), pre-ranked.
 
@@ -67,7 +67,7 @@ Each character gets one of their class's two specialties at generation. This is 
 
 ### XP Earning by Role
 
-- **Tank:** XP from damage_taken, save_pass, party protection events
+- **Tank:** XP from damage_taken, save_pass, block, taunt events
 - **Healer:** XP from heal, buff, revivify events
 - **DPS:** XP from hit, kill, crit events
 - **Utility:** XP from disarm_trap, find_treasure, save_pass, social events
@@ -94,12 +94,16 @@ Each character gets one of their class's two specialties at generation. This is 
 ### Level-Up Effects
 
 - **Stat bumps:** +1 to the stat most relevant to the character's specialty (e.g., Champion Fighter gets STR, Evoker Wizard gets INT).
-- **Specialty scaling:** At levels 4, 7, 10 the specialty's numbers improve (heal dice get bigger, crit range expands, Sneak Attack damage grows).
+- **Specialty scaling:** At levels 4, 7, 10 the specialty's core mechanic improves:
+  - DPS example: Champion's crit range expands (20 → 19-20 → 18-20)
+  - Tank example: Totem Warrior's damage resistance increases (25% → 35% → 50%)
+  - Healer example: Life Domain's heal dice grow (1d8 → 1d10 → 1d12)
+  - Utility example: Thief's treasure find bonus increases (+1 → +2 → +3)
 - **Ability unlocks:** At levels 3 (pre-draft), 6, 9, 12, 13 -- recognizable SRD abilities that change how the character interacts with encounters.
 
 ### Starting Level
 
-Characters start at **level 3** (post-scouting exhibitions). They enter the draft with tier 1 ability already unlocked. This means:
+Characters start at **level 3** (post-scouting exhibitions). Level 3 is a fiat starting point -- scouting runs don't literally award XP to reach level 3; characters are generated at level 3 with tier 1 ability already unlocked. Scouting runs generate performance data only. This means:
 - 4 ability unlock tiers remain during the season (tiers 2-5)
 - A character playing every week of a 10-week regular season + 2 playoff weeks needs to average ~25 XP/week to reach level 12-13
 - Bench time, death, and missed weeks create meaningful level gaps
@@ -155,7 +159,7 @@ Social encounters test CHA, WIS, or INT. Resolution:
 
 1. Each alive character makes a check against the encounter difficulty
 2. Characters with social specialties (Lore Bard, War Domain Cleric w/ Bless) get advantage or bonuses
-3. New events: `persuade`, `deceive`, `intimidate` -- scored like `save_pass` but with role multipliers for Utility and Healer
+3. New events: `persuade`, `deceive`, `intimidate` -- scored like `save_pass` with role multipliers for Utility (core) and Tank (secondary for intimidate)
 4. Failure isn't HP damage -- it's a **time penalty** (fewer remaining encounters in the dungeon, reducing total scoring opportunities)
 
 ### Arcane Encounter Resolution
