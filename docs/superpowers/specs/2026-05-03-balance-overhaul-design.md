@@ -275,17 +275,76 @@ Fix:
 
 Net effect: Tanks and Healers both have multiple scoring paths. Tank-heavy lineups don't starve the Healer (buff/revivify paths remain). Healer-heavy lineups don't starve Tanks (absorbed damage scoring is self-contained).
 
-## Section 5: Scouting System (TODO)
+## Section 5: Scouting System
 
-- Pre-draft exhibition runs (configurable count: 3-5 default, up to 20)
-- Generates visible per-character stats for draft evaluation
-- Enables auction draft valuations
-- Deterministic (seeded from league ID)
+Before the draft begins, the league runs exhibition dungeon runs to generate scouting data for every character in the pool.
 
-## Section 6: Season & League Settings (TODO)
+### How It Works
 
-- Default: 10 regular weeks + 2-3 playoff weeks
-- Configurable season length
-- XP curve adapts to season length
-- Scouting depth as league setting
-- Draft format as league setting (snake default, auction future)
+1. **Generation:** After characters are created (48 total), the system runs each character through N exhibition dungeons (seeded from `leagueId + "scout" + characterId`)
+2. **Party composition:** Scouting runs use randomized 4-character parties from the pool (not drafted teams). Simulates pre-season scrimmages in varied contexts.
+3. **Data captured per character:**
+   - Average points per run
+   - Points breakdown by event type (damage, heals, buffs, utility)
+   - Best/worst encounter type performance
+   - Specialty proc rate (how often their specialty ability triggered)
+   - Consistency score (variance across runs -- low = reliable, high = boom-or-bust)
+4. **Displayed in draft UI:** Scouting report card alongside each character's stats, specialty, and abilities
+
+### League Settings
+
+| Setting | Default | Options |
+|---------|---------|---------|
+| `scoutingRuns` | 5 | 3, 5, 10, 15, 20 |
+| `scoutingVisibility` | "full" | "full" (all stats), "partial" (avg only), "hidden" (stats/specialty only, no performance data) |
+
+Fewer runs = more draft uncertainty and gut-feel decisions. More runs = analytical depth, stabilized projections, better auction valuations.
+
+### Auction Draft Support
+
+When scouting data exists, the system can derive a **projected value** for each character:
+- Weighted combination of avg points, specialty proc rate, and consistency
+- Used to set starting bid prices in auction format
+- Displayed as a "market value" estimate during snake drafts too (informational)
+
+### Determinism
+
+All scouting runs are seeded. Same league seed → same scouting data. Reproducible and testable.
+
+## Section 6: Season & League Settings
+
+### Season Length
+
+| Setting | Default | Range |
+|---------|---------|-------|
+| `regularWeeks` | 10 | 5-16 |
+| `playoffWeeks` | 3 | 2-4 |
+| `playoffTeams` | 4 | 2-4 |
+
+### XP Curve Adaptation
+
+The XP thresholds scale with season length to maintain the "level 12-13 max" target:
+- `xpScaleFactor = defaultSeasonWeeks / actualSeasonWeeks`
+- Shorter seasons: thresholds shrink (faster leveling per week, lower max level reached)
+- Longer seasons: thresholds grow (slower per week, but higher ceiling reachable)
+
+### New League Settings (added by this overhaul)
+
+| Setting | Default | Options |
+|---------|---------|---------|
+| `scoutingRuns` | 5 | 3, 5, 10, 15, 20 |
+| `scoutingVisibility` | "full" | "full", "partial", "hidden" |
+| `draftFormat` | "snake" | "snake", "auction" (future) |
+| `startingLevel` | 3 | 1-5 |
+| `seasonWeeks` | 10 | 5-16 |
+| `playoffWeeks` | 3 | 2-4 |
+| `encounterCount` | "5-8" | "3-5", "5-8", "7-10" |
+
+### Retained Settings (from v1)
+
+| Setting | Default | Notes |
+|---------|---------|-------|
+| `teamCount` | 6 | unchanged |
+| `rosterSize` | 6 | unchanged |
+| `activeSize` | 4 | unchanged |
+| `contentSource` | "procedural" | unchanged |
