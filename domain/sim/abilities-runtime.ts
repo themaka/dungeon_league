@@ -14,7 +14,7 @@ export function attackStatFor(char: Character): keyof Stats {
 }
 
 export function critRangeFor(char: Character): number {
-  if (char.specialty === "Champion") {
+  if (char.class === "Fighter" && char.specialty === "Champion") {
     if (hasAbility("Fighter", "Champion", char.level, "Superior Critical")) return 18;
     if (hasAbility("Fighter", "Champion", char.level, "Improved Critical")) return 19;
   }
@@ -38,6 +38,7 @@ export function hasRage(char: Character): boolean {
   return char.class === "Barbarian" && hasAbility("Barbarian", char.specialty, char.level, "Rage");
 }
 
+// Used by sim-engine in Task 12 to gate the post-encounter revivify check.
 export function hasRevivify(char: Character): boolean {
   return (
     char.class === "Cleric" &&

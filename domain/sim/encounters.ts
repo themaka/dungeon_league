@@ -76,12 +76,13 @@ export function resolveCombat(
       });
     }
 
-    if (hasRage(char)) {
+    const raging = hasRage(char);
+    if (raging) {
       events.push({ kind: "rage", encounterId: encounter.id, actorId: char.id });
     }
 
     let damageTaken = Math.max(rng.nextInt(1, encounter.difficulty * 2) - statMod(char.stats.con), 0);
-    if (hasRage(char)) damageTaken = Math.floor(damageTaken / 2);
+    if (raging) damageTaken = Math.floor(damageTaken / 2);
 
     if (damageTaken > 0) {
       events.push({

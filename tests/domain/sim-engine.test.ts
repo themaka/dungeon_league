@@ -67,6 +67,8 @@ describe("sim engine", () => {
       "hit", "kill", "crit", "heal", "damage_taken",
       "save_pass", "save_fail", "disarm_trap", "find_treasure", "ko", "death",
       "multiattack", "sneak_attack", "smite", "rage", "block", "taunt",
+      "persuade", "deceive", "intimidate",
+      "arcane_surge", "dispel", "channel",
     ]);
     for (const event of events) {
       expect(validKinds.has(event.kind)).toBe(true);
