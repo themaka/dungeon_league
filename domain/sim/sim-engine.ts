@@ -1,6 +1,11 @@
 import type { Character, Dungeon, Lineup, SimEvent } from "domain/types";
 import type { Rng } from "domain/rng";
-import { resolveCombat, resolveTrap, resolvePuzzle, resolveTreasure } from "./encounters";
+import {
+  resolveCombat, resolveTrap, resolvePuzzle, resolveTreasure,
+  resolveSocial, resolveArcane,
+  type EncounterCtx,
+} from "./encounters";
+import { newBuffState } from "./buffs";
 
 export function runDungeon(
   lineup: Lineup,
@@ -14,28 +19,22 @@ export function runDungeon(
     hp.set(char.id, 10 + char.stats.con);
   }
 
+  const ctx: EncounterCtx = { rng, hp, buffs: newBuffState() };
   const allEvents: SimEvent[] = [];
 
   for (const encounter of dungeon.encounters) {
     const alive = activeChars.filter((c) => (hp.get(c.id) ?? 0) > 0);
     if (alive.length === 0) break;
 
-    let events: SimEvent[];
+    let events: SimEvent[] = [];
     switch (encounter.type) {
-      case "combat":
-        events = resolveCombat(alive, encounter, rng, hp);
-        break;
-      case "trap":
-        events = resolveTrap(alive, encounter, rng, hp);
-        break;
-      case "puzzle":
-        events = resolvePuzzle(alive, encounter, rng, hp);
-        break;
-      case "treasure":
-        events = resolveTreasure(alive, encounter, rng, hp);
-        break;
+      case "combat":   events = resolveCombat(alive, encounter, ctx); break;
+      case "trap":     events = resolveTrap(alive, encounter, ctx); break;
+      case "puzzle":   events = resolvePuzzle(alive, encounter, ctx); break;
+      case "treasure": events = resolveTreasure(alive, encounter, ctx); break;
+      case "social":   events = resolveSocial(alive, encounter, ctx); break;
+      case "arcane":   events = resolveArcane(alive, encounter, ctx); break;
     }
-
     allEvents.push(...events);
   }
 

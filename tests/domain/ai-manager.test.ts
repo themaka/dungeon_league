@@ -11,8 +11,11 @@ function makePool(): Character[] {
     race: "Human" as const,
     class: "Fighter" as const,
     role: roles[i % 4],
+    specialty: "Champion" as const,
     stats: { str: 10 + i, dex: 10, con: 12, int: 10, wis: 10, cha: 10 },
     level: 1,
+    xp: 0,
+    abilityTiers: [],
     description: `test ${i}`,
   }));
 }

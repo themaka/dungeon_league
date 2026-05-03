@@ -5,8 +5,9 @@ import type { SimEvent, Character, Dungeon, Highlight } from "domain/types";
 function makeChar(id: string, role: "Tank" | "Healer" | "DPS" | "Utility"): Character {
   return {
     id, name: `Hero ${id}`, race: "Human", class: "Fighter", role,
+    specialty: "Champion",
     stats: { str: 14, dex: 12, con: 13, int: 10, wis: 10, cha: 10 },
-    level: 1, description: "test",
+    level: 1, xp: 0, abilityTiers: [], description: "test",
   };
 }
 
