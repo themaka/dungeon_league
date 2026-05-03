@@ -86,3 +86,35 @@ describe("league service", () => {
     expect(totalLosses).toBe(3);
   });
 });
+
+describe("createLeague — overhaul", () => {
+  it("applies the requested preset to settings", async () => {
+    const league = await createLeague("Quick Test", "user-1", "My Team", { preset: "quick" });
+    const settings = league.settings as any;
+    expect(settings.preset).toBe("quick");
+    expect(settings.seasonWeeks).toBe(5);
+    expect(settings.scoutingRuns).toBe(3);
+  });
+
+  it("generates correct number of characters from preset.characterPool", async () => {
+    const league = await createLeague("Champions", "user-1", "Boss Team", { preset: "champions" });
+    const count = await prisma.character.count({ where: { leagueId: league.id } });
+    expect(count).toBe(72);
+  });
+
+  it("stores scouting reports on the league", async () => {
+    const league = await createLeague("Scout Test", "user-1", "Team", { preset: "standard" });
+    const fresh = await prisma.league.findUniqueOrThrow({ where: { id: league.id } });
+    expect(fresh.scoutingReports).toBeDefined();
+    const reports = fresh.scoutingReports as any;
+    expect(Object.keys(reports).length).toBeGreaterThan(0);
+  });
+
+  it("characters start at preset.startingLevel (veterans = 5)", async () => {
+    const league = await createLeague("Vet Test", "user-1", "Team", { preset: "veterans" });
+    const settings = league.settings as any;
+    expect(settings.startingLevel).toBe(5);
+    const chars = await prisma.character.findMany({ where: { leagueId: league.id } });
+    expect(chars.every((c) => c.level === 5)).toBe(true);
+  });
+});
