@@ -325,12 +325,45 @@ All scouting runs are seeded. Same league seed → same scouting data. Reproduci
 | `playoffWeeks` | 3 | 2-4 |
 | `playoffTeams` | 4 | 2-4 |
 
-### XP Curve Adaptation
+### Level Cap & XP Curve Adaptation
 
-The XP thresholds scale with season length to maintain the "level 12-13 max" target:
-- `xpScaleFactor = defaultSeasonWeeks / actualSeasonWeeks`
-- Shorter seasons: thresholds shrink (faster leveling per week, lower max level reached)
-- Longer seasons: thresholds grow (slower per week, but higher ceiling reachable)
+**Max level is 20** (matching traditional D&D PC cap). The XP curve extends beyond level 13:
+
+| Level | Cumulative XP | XP for this level | What happens |
+|-------|--------------|-------------------|--------------|
+| 13→14 | 450 | 70 | Stat bump |
+| 14→15 | 530 | 80 | **Ability unlock tier 6** |
+| 15→16 | 620 | 90 | Stat bump + specialty scaling |
+| 16→17 | 720 | 100 | Stat bump |
+| 17→18 | 840 | 120 | **Ability unlock tier 7** |
+| 18→19 | 980 | 140 | Stat bump + specialty scaling |
+| 19→20 | 1140 | 160 | **Capstone ability** (tier 8) |
+
+The `targetLevel` setting controls how the XP curve scales to season length:
+- Default target: level 12-13 over a 10+3 week season
+- Players can choose higher targets (longer seasons or faster XP rates)
+- `xpScaleFactor = defaultSeasonWeeks / actualSeasonWeeks` adjusts thresholds
+
+Reaching level 20 in a standard season is impossible by design -- it requires either a very long season (20+ weeks) or the Champions league preset.
+
+### League Presets
+
+Pre-configured setting bundles for common play styles:
+
+| Preset | Starting Level | Target Level | Season | Scouting | Pool Size | XP |
+|--------|---------------|-------------|--------|----------|-----------|-----|
+| **Standard** (default) | 3 | 12-13 | 10+3 | 5 runs | 48 | normal |
+| **Quick Play** | 3 | 8-9 | 5+2 | 3 runs | 48 | normal |
+| **Epic Campaign** | 3 | 18-20 | 20+4 | 5 runs | 48 | normal |
+| **Champions** | 20 | -- | 10+3 | 15 runs | 72 | disabled |
+| **Veterans** | 5 | 15-16 | 12+3 | 15 runs | 48 | normal |
+
+**Champions preset details:**
+- All characters start at level 20 with all abilities unlocked
+- XP/leveling disabled (no progression, pure competition)
+- Larger character pool (72 instead of 48) for more draft variety at full power
+- More scouting runs (15) since there's no progression uncertainty -- draft decisions are purely about fit and matchup optimization
+- Every character has all 8 ability tiers active, creating complex team composition decisions
 
 ### New League Settings (added by this overhaul)
 
@@ -339,10 +372,15 @@ The XP thresholds scale with season length to maintain the "level 12-13 max" tar
 | `scoutingRuns` | 5 | 3, 5, 10, 15, 20 |
 | `scoutingVisibility` | "full" | "full", "partial", "hidden" |
 | `draftFormat` | "snake" | "snake", "auction" (future) |
-| `startingLevel` | 3 | 1-5 |
-| `seasonWeeks` | 10 | 5-16 |
+| `startingLevel` | 3 | 1-20 |
+| `targetLevel` | 13 | 8-20 |
+| `maxLevel` | 20 | 10-20 |
+| `seasonWeeks` | 10 | 5-24 |
 | `playoffWeeks` | 3 | 2-4 |
 | `encounterCount` | "5-8" | "3-5", "5-8", "7-10" |
+| `characterPool` | 48 | 36-96 |
+| `xpEnabled` | true | true, false |
+| `preset` | "standard" | "standard", "quick", "epic", "champions", "veterans" |
 
 ### Retained Settings (from v1)
 
