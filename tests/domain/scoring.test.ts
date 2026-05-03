@@ -126,6 +126,27 @@ describe("scoring", () => {
     ];
     const r = score(events, [c, target]);
     expect(r.milestones.some((m) => m.kind === "revivify_save" && m.actorId === "h")).toBe(true);
+    // base 5 (revivify) + role 0.75x (Healer core) + specialty 0.25x (Life Domain core) = 5 + 3.75 + 1.25
+    // milestonePoints from revivify_save should add +3
+    expect(r.perCharacter.get("h")!.milestonePoints).toBeGreaterThanOrEqual(3);
+  });
+
+  it("revivify without a prior death does NOT award revivify_save milestone", () => {
+    const c = makeChar("h", "Healer", "Cleric", "Life Domain");
+    const target = makeChar("t", "DPS");
+    const events: SimEvent[] = [
+      { kind: "revivify", encounterId: "e", actorId: "h", targetId: "t" },
+    ];
+    const r = score(events, [c, target]);
+    expect(r.milestones.some((m) => m.kind === "revivify_save")).toBe(false);
+  });
+
+  it("multiattack with amount=0 scores 0 base points", () => {
+    const c = makeChar("a", "DPS", "Fighter", "Battle Master");
+    const events: SimEvent[] = [
+      { kind: "multiattack", encounterId: "e", actorId: "a", amount: 0 },
+    ];
+    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(0);
   });
 
   it("flawless_run still awards +3 to all on no ko/death", () => {

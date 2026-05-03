@@ -25,13 +25,16 @@ const BASE_POINTS: Record<EventKind, number | ((e: SimEvent) => number)> = {
   dispel: 2,
   channel: 1,
   arcane_surge: 3,
-  multiattack: (e) => (e.amount ?? 1) * 0.5,
+  multiattack: (e) => (e.amount ?? 0) * 0.5,
   sneak_attack: (e) => (e.amount ?? 0) * 0.15,
   smite: (e) => (e.amount ?? 0) * 0.15,
   rage: 1,
   revivify: 5,
 };
 
+// Role multipliers — events that magnify scoring for matching roles.
+// Penalty events (save_fail, ko, death) are intentionally excluded:
+// they apply equally to all roles and don't warrant role-based amplification.
 const ROLE_CORE_EVENTS: Record<string, Set<EventKind>> = {
   Tank: new Set(["block", "taunt", "damage_taken"]),
   Healer: new Set(["heal", "buff", "buff_proc", "revivify"]),
@@ -122,11 +125,14 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
     if (cs) cs.milestonePoints += 5;
   }
 
+  const deadIds = new Set<string>();
   for (const e of events) {
-    if (e.kind === "revivify" && e.targetId) {
+    if (e.kind === "death") deadIds.add(e.actorId);
+    if (e.kind === "revivify" && e.targetId && deadIds.has(e.targetId)) {
       milestones.push({ kind: "revivify_save", actorId: e.actorId });
       const cs = scores.get(e.actorId);
       if (cs) cs.milestonePoints += 3;
+      deadIds.delete(e.targetId);
     }
   }
 
