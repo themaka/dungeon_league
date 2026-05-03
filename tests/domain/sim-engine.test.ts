@@ -2,13 +2,29 @@ import { describe, it, expect } from "vitest";
 import { createRng } from "domain/rng";
 import { runDungeon } from "domain/sim/sim-engine";
 import { ProceduralSource } from "domain/content/procedural-source";
-import type { Lineup, SimEvent } from "domain/types";
+import { type Lineup, type SimEvent, type Dungeon, DEFAULT_LEAGUE_SETTINGS } from "domain/types";
+
+// Build a dungeon using only encounter types the current sim-engine handles
+// (social and arcane are Task 10's domain).
+function makeDungeon(seed: number): Dungeon {
+  const rng = createRng(seed);
+  const types = ["combat", "trap", "puzzle", "treasure"] as const;
+  const encounters = Array.from({ length: 5 }, (_, i) => ({
+    id: `enc-test-${seed}-${i}`,
+    type: types[i % types.length],
+    name: `Encounter ${i}`,
+    difficulty: rng.nextInt(1, 10),
+    targetStats: ["str" as const, "con" as const],
+    isBoss: i === 4,
+  }));
+  return { id: `dungeon-test-${seed}`, name: "Test Dungeon", theme: "undead", encounters };
+}
 
 function makeTestSetup(seed: number) {
   const rng = createRng(seed);
   const source = new ProceduralSource();
-  const chars = source.generateCharacters(6, createRng(seed + 1));
-  const dungeon = source.generateDungeon(1, 0, createRng(seed + 2));
+  const chars = source.generateCharacters(6, createRng(seed + 1), DEFAULT_LEAGUE_SETTINGS);
+  const dungeon = makeDungeon(seed + 2);
   const lineup: Lineup = {
     active: [chars[0].id, chars[1].id, chars[2].id, chars[3].id] as [string, string, string, string],
     bench: [chars[4].id, chars[5].id] as [string, string],

@@ -36,9 +36,9 @@ export const DUNGEON_NOUNS = [
 ];
 
 export const DUNGEON_THEMES = [
-  "undead", "fire", "ice", "shadow", "nature",
-  "arcane", "demonic", "draconic", "mechanical", "aquatic",
-];
+  "undead", "fire", "shadow", "arcane", "demonic",
+  "nature", "mechanical", "aquatic", "draconic", "ice",
+] as const;
 
 export const ENCOUNTER_NAMES: Record<string, string[]> = {
   combat: [
@@ -60,6 +60,14 @@ export const ENCOUNTER_NAMES: Record<string, string[]> = {
     "Hidden Vault", "Dragon Hoard", "Sunken Chest", "Enchanted Armory",
     "Gem Cache", "Relic Chamber", "Golden Idol", "Crystal Garden",
     "Coin Fountain", "Trophy Hall",
+  ],
+  social: [
+    "the Diplomat's Gambit", "the Court of Whispers", "the Merchant's Bargain",
+    "the Oathkeeper's Vigil", "the Beggar's Plea",
+  ],
+  arcane: [
+    "the Sealed Ward", "the Planar Rift", "the Sigil of Binding",
+    "the Eldritch Cipher", "the Mana Storm",
   ],
 };
 
