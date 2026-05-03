@@ -38,4 +38,29 @@ describe("scouting", () => {
       expect(projectedValue(reports[c.id])).toBeGreaterThanOrEqual(0);
     }
   });
+
+  it("pointsByEventType is keyed by event kind, not encounter type", () => {
+    const src = new ProceduralSource();
+    const chars = src.generateCharacters(8, createRng(99), DEFAULT_LEAGUE_SETTINGS);
+    const reports = runScouting(chars, src, "L", 5, DEFAULT_LEAGUE_SETTINGS);
+    // Find at least one character whose breakdown contains an event-kind key
+    const someReport = Object.values(reports).find((r) => Object.keys(r.pointsByEventType).length > 0);
+    expect(someReport).toBeDefined();
+    if (someReport) {
+      const keys = Object.keys(someReport.pointsByEventType);
+      // Event kinds, not encounter types
+      const validEventKinds = new Set([
+        "hit", "kill", "crit", "heal", "damage_taken", "save_pass", "save_fail",
+        "disarm_trap", "find_treasure", "ko", "death",
+        "buff", "buff_proc", "block", "taunt",
+        "persuade", "deceive", "intimidate",
+        "dispel", "channel", "arcane_surge",
+        "multiattack", "sneak_attack", "smite", "rage", "revivify",
+      ]);
+      const encounterTypes = new Set(["combat", "trap", "puzzle", "treasure", "social", "arcane"]);
+      // Should contain at least one event-kind key, not encounter-type keys
+      expect(keys.some((k) => validEventKinds.has(k))).toBe(true);
+      expect(keys.every((k) => !encounterTypes.has(k))).toBe(true);
+    }
+  });
 });

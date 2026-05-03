@@ -29,13 +29,13 @@ export function runScouting(
 ): Record<string, ScoutingReport> {
   const charMap = new Map(characters.map((c) => [c.id, c]));
   const perCharRunPoints = new Map<string, number[]>();
-  const perCharEventPoints = new Map<string, Record<string, number>>();
+  const perCharByEventKind = new Map<string, Record<string, number>>();
   const perCharProcCount = new Map<string, { proc: number; total: number }>();
   const perCharByEncounterType = new Map<string, Record<EncounterType, number[]>>();
 
   for (const c of characters) {
     perCharRunPoints.set(c.id, []);
-    perCharEventPoints.set(c.id, {});
+    perCharByEventKind.set(c.id, {});
     perCharProcCount.set(c.id, { proc: 0, total: 0 });
     perCharByEncounterType.set(c.id, {
       combat: [], trap: [], puzzle: [], treasure: [], social: [], arcane: [],
@@ -66,10 +66,10 @@ export function runScouting(
         if (!cs) continue;
         perCharRunPoints.get(c.id)!.push(cs.totalPoints);
 
-        const eventBreakdown = perCharEventPoints.get(c.id)!;
+        const byKind = perCharByEventKind.get(c.id)!;
         for (const e of events) {
           if (e.actorId !== c.id) continue;
-          eventBreakdown[e.kind] = (eventBreakdown[e.kind] ?? 0) + 1;
+          byKind[e.kind] = (byKind[e.kind] ?? 0) + 1;
         }
 
         const procStat = perCharProcCount.get(c.id)!;
@@ -89,7 +89,9 @@ export function runScouting(
           eventsByEnc.get(enc.type)!.push(e);
         }
         for (const [encType, evs] of eventsByEnc) {
-          const subtotal = score(evs, [c]).perCharacter.get(c.id)!.totalPoints;
+          const cs = score(evs, [c]).perCharacter.get(c.id)!;
+          // Exclude milestonePoints to avoid systematic flawless_run inflation on subset events.
+          const subtotal = cs.basePoints + cs.roleMultiplierPoints + cs.specialtyBonusPoints;
           byEnc[encType as EncounterType].push(subtotal);
         }
       }
@@ -121,7 +123,7 @@ export function runScouting(
       characterId: c.id,
       runs,
       avgPoints: Number(avg.toFixed(2)),
-      pointsByEventType: avgByType,
+      pointsByEventType: perCharByEventKind.get(c.id) ?? {},
       bestEncounterType: bestType,
       worstEncounterType: worstType,
       specialtyProcRate: procs.total > 0 ? procs.proc / procs.total : 0,
