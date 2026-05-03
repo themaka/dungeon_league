@@ -171,8 +171,6 @@ export class ProceduralSource implements ContentSource {
   }
 
   getHighlightTemplates(): HighlightTemplateBundle {
-    // TODO Task 14: cast required until highlight-templates.ts is expanded with
-    // the new event-kind arrays. Remove the cast once the bundle shape is fully populated.
-    return DEFAULT_HIGHLIGHT_TEMPLATES as unknown as HighlightTemplateBundle;
+    return DEFAULT_HIGHLIGHT_TEMPLATES;
   }
 }
