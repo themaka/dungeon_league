@@ -32,6 +32,8 @@ export async function getDraftState(leagueId: string) {
 
   const teamIds = teams.map((t) => t.id);
   const settings = league.settings as any;
+  const visibility = settings.scoutingVisibility ?? "full";
+  const reports = (league.scoutingReports as Record<string, any>) ?? {};
   const draftOrder = generateSnakeDraftOrder(teamIds, settings.rosterSize);
   const currentPick = drafted.length;
 
@@ -43,17 +45,30 @@ export async function getDraftState(leagueId: string) {
       ...d,
       managerType: teams.find((t) => t.id === d.teamId)!.managerType,
     })),
-    available: available.map((c) => ({
-      id: c.id,
-      externalId: c.externalId,
-      name: c.name,
-      race: c.race,
-      class: c.class,
-      role: c.role,
-      stats: c.stats,
-      level: c.level,
-      description: c.description,
-    })),
+    available: available.map((c) => {
+      const r = reports[c.externalId];
+      const scoutingPayload = (() => {
+        if (!r) return undefined;
+        if (visibility === "hidden") return undefined;
+        if (visibility === "partial") return { avgPoints: r.avgPoints };
+        return r;
+      })();
+      return {
+        id: c.id,
+        externalId: c.externalId,
+        name: c.name,
+        race: c.race,
+        class: c.class,
+        role: c.role,
+        specialty: c.specialty,
+        stats: c.stats,
+        level: c.level,
+        xp: c.xp,
+        abilityTiers: c.abilityTiers,
+        description: c.description,
+        scouting: scoutingPayload,
+      };
+    }),
     teams: teams.map((t) => ({
       id: t.id,
       name: t.name,
@@ -106,8 +121,11 @@ export async function makeAIPick(leagueId: string) {
     race: c.race as any,
     class: c.class as any,
     role: c.role as any,
+    specialty: (c as any).specialty,
     stats: c.stats as any,
     level: c.level,
+    xp: (c as any).xp ?? 0,
+    abilityTiers: ((c as any).abilityTiers as number[]) ?? [],
     description: c.description,
   }));
 
@@ -117,8 +135,11 @@ export async function makeAIPick(leagueId: string) {
     race: c.race as any,
     class: c.class as any,
     role: c.role as any,
+    specialty: (c as any).specialty,
     stats: c.stats as any,
     level: c.level,
+    xp: (c as any).xp ?? 0,
+    abilityTiers: ((c as any).abilityTiers as number[]) ?? [],
     description: c.description,
   }));
 
