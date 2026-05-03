@@ -284,3 +284,63 @@ describe("buff generation", () => {
     expect(procEvents.length).toBeLessThanOrEqual(6);
   });
 });
+
+describe("revivify", () => {
+  it("Life Domain Cleric with charges revives a fallen ally and emits revivify event", () => {
+    const cleric: Character = {
+      id: "cl", name: "Cl", race: "Human", class: "Cleric", role: "Healer",
+      specialty: "Life Domain",
+      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 18, cha: 12 },
+      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+    };
+    const fragile: Character = {
+      ...cleric, id: "f", class: "Wizard", role: "DPS", specialty: "Evoker",
+      stats: { str: 6, dex: 8, con: 6, int: 18, wis: 10, cha: 10 },
+    };
+    const tank: Character = {
+      ...cleric, id: "t", class: "Barbarian", role: "Tank", specialty: "Berserker",
+      stats: { str: 18, dex: 10, con: 16, int: 8, wis: 8, cha: 8 },
+    };
+    const charMap = new Map([cleric, fragile, tank].map((c) => [c.id, c]));
+    const lineup: Lineup = { active: [cleric.id, fragile.id, tank.id, tank.id], bench: ["x", "y"] };
+    const dungeon: Dungeon = {
+      id: "d", name: "T", theme: "demonic",
+      encounters: Array.from({ length: 6 }, (_, i) => ({
+        id: `e${i}`, type: "combat" as const, name: "Demon", difficulty: 8,
+        targetStats: ["str" as const], isBoss: i === 5,
+      })),
+    };
+    let sawRevivify = false;
+    for (let s = 0; s < 50 && !sawRevivify; s++) {
+      const events = runDungeon(lineup, charMap, dungeon, createRng(s), { revivifyCharges: { cl: 1 } });
+      if (events.some((e) => e.kind === "revivify" && e.actorId === "cl")) sawRevivify = true;
+    }
+    expect(sawRevivify).toBe(true);
+  });
+
+  it("without charges, no revivify event is emitted", () => {
+    const cleric: Character = {
+      id: "cl", name: "Cl", race: "Human", class: "Cleric", role: "Healer",
+      specialty: "Life Domain",
+      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 18, cha: 12 },
+      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+    };
+    const fragile: Character = {
+      ...cleric, id: "f", class: "Wizard", role: "DPS", specialty: "Evoker",
+      stats: { str: 6, dex: 8, con: 6, int: 18, wis: 10, cha: 10 },
+    };
+    const charMap = new Map([cleric, fragile].map((c) => [c.id, c]));
+    const lineup: Lineup = { active: [cleric.id, fragile.id, fragile.id, fragile.id], bench: ["x", "y"] };
+    const dungeon: Dungeon = {
+      id: "d", name: "T", theme: "demonic",
+      encounters: [{
+        id: "e1", type: "combat", name: "Foe", difficulty: 9,
+        targetStats: ["str"], isBoss: true,
+      }],
+    };
+    for (let s = 0; s < 30; s++) {
+      const events = runDungeon(lineup, charMap, dungeon, createRng(s), { revivifyCharges: {} });
+      expect(events.some((e) => e.kind === "revivify")).toBe(false);
+    }
+  });
+});
