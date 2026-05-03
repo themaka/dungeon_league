@@ -35,11 +35,6 @@ export const DUNGEON_NOUNS = [
   "Dungeon", "Lair", "Tomb", "Pit", "Warren",
 ];
 
-export const DUNGEON_THEMES = [
-  "undead", "fire", "shadow", "arcane", "demonic",
-  "nature", "mechanical", "aquatic", "draconic", "ice",
-] as const;
-
 export const ENCOUNTER_NAMES: Record<string, string[]> = {
   combat: [
     "Goblin Ambush", "Skeleton Patrol", "Orc Warband", "Spider Nest",

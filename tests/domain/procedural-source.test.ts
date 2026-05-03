@@ -52,4 +52,24 @@ describe("ProceduralSource", () => {
     const dungeon = src.generateDungeon(1, 0, createRng(3), "shadow", "5-8");
     expect(dungeon.theme).toBe("shadow");
   });
+
+  it("characters at startingLevel 5 begin with 70 XP (veterans preset)", () => {
+    const src = new ProceduralSource();
+    const settings = { ...DEFAULT_LEAGUE_SETTINGS, startingLevel: 5 };
+    const chars = src.generateCharacters(6, createRng(11), settings);
+    for (const c of chars) {
+      expect(c.level).toBe(5);
+      expect(c.xp).toBe(70);
+    }
+  });
+
+  it("characters at startingLevel 1 begin with 0 XP", () => {
+    const src = new ProceduralSource();
+    const settings = { ...DEFAULT_LEAGUE_SETTINGS, startingLevel: 1 };
+    const chars = src.generateCharacters(4, createRng(13), settings);
+    for (const c of chars) {
+      expect(c.level).toBe(1);
+      expect(c.xp).toBe(0);
+    }
+  });
 });

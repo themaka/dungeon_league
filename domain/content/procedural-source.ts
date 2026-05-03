@@ -5,6 +5,7 @@ import type {
 import { CLASS_ROLE_MAP } from "domain/types";
 import { CLASS_SPECIALTY_MAP, primaryStatForSpecialty } from "domain/specialties";
 import { unlockTierForLevel } from "domain/abilities";
+import { XP_THRESHOLDS, STAT_BUMP_LEVELS, SCALING_LEVELS } from "domain/leveling";
 import { pickEncounterType } from "domain/themes";
 import type { Rng } from "domain/rng";
 import type { ContentSource, HighlightTemplateBundle } from "./content-source";
@@ -44,16 +45,13 @@ function rollStats(rng: Rng): Stats {
   };
 }
 
-// Must match the level sets in domain/leveling.ts (STAT_BUMP_LEVELS and
-// SCALING_LEVELS). Each set contributes +1 to the primary stat at the listed
-// levels; the sets are disjoint so a level grants exactly +1 stat (not +2).
+// Total stat bumps a character of the given level has accrued from the leveling
+// system. Mirrors the loop inside applyXpAndLevel — see domain/leveling.ts.
 function statBumpsForLevel(level: number): number {
   let bumps = 0;
-  const statBumpLevels = new Set([2, 5, 8, 11, 14, 17]);
-  const scalingLevels = new Set([4, 7, 10, 16, 19]);
   for (let l = 2; l <= level; l++) {
-    if (statBumpLevels.has(l)) bumps += 1;
-    if (scalingLevels.has(l)) bumps += 1;
+    if (STAT_BUMP_LEVELS.has(l)) bumps += 1;
+    if (SCALING_LEVELS.has(l)) bumps += 1;
   }
   return bumps;
 }
@@ -114,7 +112,8 @@ export class ProceduralSource implements ContentSource {
       const primary = primaryStatForSpecialty(specialty);
       stats[primary] = stats[primary] + statBumpsForLevel(startingLevel);
 
-      const startingXp = startingLevel >= 3 ? 30 : 0;
+      // Start at the XP floor for the chosen level (e.g. level 5 => 70 XP).
+      const startingXp = XP_THRESHOLDS[startingLevel] ?? 0;
 
       characters.push({
         id: `char-${i}-${firstName.toLowerCase()}`,
@@ -172,7 +171,8 @@ export class ProceduralSource implements ContentSource {
   }
 
   getHighlightTemplates(): HighlightTemplateBundle {
-    // Cast needed until Task 14 fills in the new event-kind arrays in highlight-templates.ts
+    // TODO Task 14: cast required until highlight-templates.ts is expanded with
+    // the new event-kind arrays. Remove the cast once the bundle shape is fully populated.
     return DEFAULT_HIGHLIGHT_TEMPLATES as unknown as HighlightTemplateBundle;
   }
 }
