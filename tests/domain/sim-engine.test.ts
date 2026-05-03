@@ -248,4 +248,39 @@ describe("buff generation", () => {
     }
     expect(sawProc).toBe(true);
   });
+
+  it("buffs do not accumulate across encounters (per-encounter scope)", () => {
+    // A War Domain Cleric (Devotion at 6) generates a 99-charge aura.
+    // If aura state leaks across encounters, target ends up with hundreds of charges.
+    // We verify by counting buff events emitted in a 2-encounter dungeon: each encounter
+    // should generate exactly one buff event from the Cleric (one for each encounter),
+    // and target's stored buff count should never exceed the per-encounter cap.
+    const cleric: Character = {
+      id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
+      specialty: "War Domain",
+      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 14 },
+      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+    };
+    const ally: Character = {
+      ...cleric, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
+      stats: { str: 16, dex: 12, con: 14, int: 8, wis: 10, cha: 8 },
+    };
+    const charMap = new Map([cleric, ally].map((ch) => [ch.id, ch]));
+    const lineup: Lineup = { active: [cleric.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
+    const dungeon: Dungeon = {
+      id: "d", name: "T", theme: "fire",
+      encounters: [
+        { id: "e1", type: "puzzle", name: "P1", difficulty: 1, targetStats: ["int"], isBoss: false },
+        { id: "e2", type: "puzzle", name: "P2", difficulty: 1, targetStats: ["int"], isBoss: false },
+      ],
+    };
+    const events = runDungeon(lineup, charMap, dungeon, createRng(42));
+    // Cleric should generate exactly one "buff" event per encounter (2 total).
+    const buffEvents = events.filter((e) => e.kind === "buff" && e.actorId === "c");
+    expect(buffEvents.length).toBe(2);
+    // The number of buff_proc events from the Cleric should not exceed the per-encounter cap
+    // (3 bless charges per encounter × 2 encounters = at most 6).
+    const procEvents = events.filter((e) => e.kind === "buff_proc" && e.actorId === "c");
+    expect(procEvents.length).toBeLessThanOrEqual(6);
+  });
 });

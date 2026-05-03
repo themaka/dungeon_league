@@ -19,12 +19,13 @@ export function runDungeon(
     hp.set(char.id, 10 + char.stats.con);
   }
 
-  const ctx: EncounterCtx = { rng, hp, buffs: newBuffState() };
   const allEvents: SimEvent[] = [];
 
   for (const encounter of dungeon.encounters) {
     const alive = activeChars.filter((c) => (hp.get(c.id) ?? 0) > 0);
     if (alive.length === 0) break;
+
+    const ctx: EncounterCtx = { rng, hp, buffs: newBuffState() };
 
     let events: SimEvent[] = [];
     switch (encounter.type) {
