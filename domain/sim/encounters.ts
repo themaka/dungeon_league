@@ -69,7 +69,7 @@ export function resolveCombat(
       });
     }
 
-    if (hasSmite(char) && hitDamages.length > 0) {
+    if (hasSmite(char) && hitDamages.length > 0 && rng.next() < 0.4) {
       const bonus = rng.nextInt(4, 12);
       events.push({
         kind: "smite", encounterId: encounter.id, actorId: char.id, amount: bonus,
