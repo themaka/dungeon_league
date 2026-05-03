@@ -10,6 +10,7 @@ import { generateRegularSeason } from "domain/schedule";
 import { type Character, type Lineup } from "domain/types";
 import { applyPreset } from "domain/presets";
 import { runScouting } from "domain/scouting";
+import { applyXpAndLevel, xpFromEvents } from "domain/leveling";
 import type { LeagueSettings, PresetName } from "domain/types";
 
 const connectionString = process.env.DATABASE_URL ?? "postgresql://dungeon:league@localhost:5432/dungeon_league?schema=public";
@@ -195,6 +196,37 @@ export async function advanceWeek(leagueId: string) {
 
     const homeResult = await processTeam(matchup.homeTeam);
     const awayResult = await processTeam(matchup.awayTeam);
+
+    if (leagueSettings.xpEnabled !== false) {
+      const xpScale = 10 / Math.max(1, leagueSettings.seasonWeeks ?? 10);
+      for (const teamSide of ["home", "away"] as const) {
+        const result = teamSide === "home" ? homeResult : awayResult;
+        const teamId = teamSide === "home" ? matchup.homeTeamId : matchup.awayTeamId;
+        const teamChars = allChars.filter((c) => c.teamId === teamId);
+        for (const dbChar of teamChars) {
+          const domainChar = charMap.get(dbChar.externalId);
+          if (!domainChar) continue;
+          const xpAward = xpFromEvents(domainChar, result.events);
+          if (xpAward <= 0 && domainChar.level >= (leagueSettings.maxLevel ?? 20)) continue;
+          const { character: updated, levelUps } = applyXpAndLevel(
+            domainChar, xpAward, xpScale, leagueSettings.maxLevel ?? 20,
+          );
+          if (xpAward > 0 || levelUps.length > 0) {
+            await prisma.character.update({
+              where: { id: dbChar.id },
+              data: {
+                xp: updated.xp,
+                level: updated.level,
+                stats: updated.stats as any,
+                abilityTiers: updated.abilityTiers as any,
+              },
+            });
+            // Refresh local map so subsequent matchups in the same week see new state
+            charMap.set(updated.id, updated);
+          }
+        }
+      }
+    }
 
     const winnerId = homeResult.teamTotal >= awayResult.teamTotal
       ? matchup.homeTeamId
