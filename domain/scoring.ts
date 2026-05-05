@@ -4,8 +4,8 @@ import type {
 import { isCoreEventForSpecialty } from "./specialties";
 
 const BASE_POINTS: Record<EventKind, number | ((e: SimEvent) => number)> = {
-  hit: (e) => (e.amount ?? 0) * 0.1,
-  kill: (e) => (e.meta?.boss ? 5 : 2),
+  hit: (e) => (e.amount ?? 0) * 0.12,
+  kill: (e) => (e.meta?.boss ? 7 : 2),
   crit: 1.5,
   heal: (e) => (e.amount ?? 0) * 0.1,
   damage_taken: (e) => (e.amount ?? 0) * 0.1,

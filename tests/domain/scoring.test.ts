@@ -16,17 +16,17 @@ function makeChar(
 }
 
 describe("scoring", () => {
-  it("scores hit events at 0.1 per damage", () => {
+  it("scores hit events at 0.12 per damage", () => {
     const chars = [makeChar("a", "DPS")];
     const events: SimEvent[] = [{ kind: "hit", encounterId: "e1", actorId: "a", amount: 10 }];
-    expect(score(events, chars).perCharacter.get("a")!.basePoints).toBe(1);
+    expect(score(events, chars).perCharacter.get("a")!.basePoints).toBeCloseTo(1.2, 4);
   });
 
   it("DPS core multiplier is 0.75 for hit", () => {
     const chars = [makeChar("a", "DPS")];
     const events: SimEvent[] = [{ kind: "hit", encounterId: "e1", actorId: "a", amount: 10 }];
     const r = score(events, chars).perCharacter.get("a")!;
-    expect(r.roleMultiplierPoints).toBeCloseTo(0.75, 4);
+    expect(r.roleMultiplierPoints).toBeCloseTo(0.9, 4);
   });
 
   it("Tank core multiplier is 0.75 for damage_taken at 0.1/dmg", () => {
@@ -109,12 +109,12 @@ describe("scoring", () => {
     expect(r.specialtyBonusPoints).toBeCloseTo(0.75, 4);
   });
 
-  it("kills boss at +5 (up from +3)", () => {
+  it("kills boss at +7", () => {
     const c = makeChar("a", "DPS");
     const events: SimEvent[] = [
       { kind: "kill", encounterId: "e", actorId: "a", meta: { boss: true } },
     ];
-    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(5);
+    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(7);
   });
 
   it("revivify_save milestone awards bonus to reviver", () => {
