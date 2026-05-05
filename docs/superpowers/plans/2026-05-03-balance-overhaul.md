@@ -1889,9 +1889,12 @@ function rollStats(rng: Rng): Stats {
   };
 }
 
+// Must match the level sets in domain/leveling.ts (STAT_BUMP_LEVELS and
+// SCALING_LEVELS). Each set contributes +1 to the primary stat at the listed
+// levels; the sets are disjoint so a level grants exactly +1 stat (not +2).
 function statBumpsForLevel(level: number): number {
   let bumps = 0;
-  const statBumpLevels = new Set([2, 4, 5, 7, 8, 10, 11, 14, 16, 17, 19]);
+  const statBumpLevels = new Set([2, 5, 8, 11, 14, 17]);
   const scalingLevels = new Set([4, 7, 10, 16, 19]);
   for (let l = 2; l <= level; l++) {
     if (statBumpLevels.has(l)) bumps += 1;
@@ -1956,7 +1959,8 @@ export class ProceduralSource implements ContentSource {
       const primary = primaryStatForSpecialty(specialty);
       stats[primary] = stats[primary] + statBumpsForLevel(startingLevel);
 
-      const startingXp = startingLevel >= 3 ? 30 : 0;
+      // Start at the XP floor for the chosen level (e.g. level 5 => 70 XP).
+      const startingXp = XP_THRESHOLDS[startingLevel] ?? 0;
 
       characters.push({
         id: `char-${i}-${firstName.toLowerCase()}`,
