@@ -69,7 +69,7 @@ describe("sim engine", () => {
       "multiattack", "sneak_attack", "smite", "rage", "block", "taunt",
       "persuade", "deceive", "intimidate",
       "arcane_surge", "dispel", "channel",
-      "buff", "buff_proc",
+      "buff_proc", "revivify",
     ]);
     for (const event of events) {
       expect(validKinds.has(event.kind)).toBe(true);
@@ -196,7 +196,7 @@ describe("class-aware combat", () => {
 });
 
 describe("buff generation", () => {
-  it("War Domain Cleric generates buff events for party", () => {
+  it("War Domain Cleric generates buff_proc events when allies pass saves with bless", () => {
     const c: Character = {
       id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
       specialty: "War Domain",
@@ -205,40 +205,15 @@ describe("buff generation", () => {
     };
     const ally: Character = {
       ...c, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
-      stats: { str: 16, dex: 12, con: 14, int: 8, wis: 10, cha: 8 },
-    };
-    const charMap = new Map([c, ally].map((ch) => [ch.id, ch]));
-    const lineup: Lineup = { active: [c.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
-    const dungeon: Dungeon = {
-      id: "d", name: "T", theme: "fire",
-      encounters: [{
-        id: "e1", type: "combat", name: "Foe", difficulty: 4,
-        targetStats: ["str"], isBoss: false,
-      }],
-    };
-    const events = runDungeon(lineup, charMap, dungeon, createRng(5));
-    expect(events.some((e) => e.kind === "buff" && e.actorId === "c")).toBe(true);
-  });
-
-  it("buff_proc credits buffer when buffed ally save_passes", () => {
-    const c: Character = {
-      id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
-      specialty: "War Domain",
-      stats: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 14 },
-      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
-    };
-    const ally: Character = {
-      ...c, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
-      stats: { str: 16, dex: 12, con: 14, int: 14, wis: 14, cha: 8 },
+      stats: { str: 16, dex: 14, con: 14, int: 12, wis: 12, cha: 8 },
     };
     const charMap = new Map([c, ally].map((ch) => [ch.id, ch]));
     const lineup: Lineup = { active: [c.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
     const dungeon: Dungeon = {
       id: "d", name: "T", theme: "mechanical",
       encounters: [
-        { id: "e1", type: "combat", name: "Foe", difficulty: 2, targetStats: ["str"], isBoss: false },
+        { id: "e1", type: "trap", name: "Trap", difficulty: 1, targetStats: ["dex"], isBoss: false },
         { id: "e2", type: "trap", name: "Trap", difficulty: 1, targetStats: ["dex"], isBoss: false },
-        { id: "e3", type: "trap", name: "Trap", difficulty: 1, targetStats: ["dex"], isBoss: false },
       ],
     };
     let sawProc = false;
@@ -249,39 +224,31 @@ describe("buff generation", () => {
     expect(sawProc).toBe(true);
   });
 
-  it("buffs do not accumulate across encounters (per-encounter scope)", () => {
-    // A War Domain Cleric (Devotion at 6) generates a 99-charge aura.
-    // If aura state leaks across encounters, target ends up with hundreds of charges.
-    // We verify by counting buff events emitted in a 2-encounter dungeon: each encounter
-    // should generate exactly one buff event from the Cleric (one for each encounter),
-    // and target's stored buff count should never exceed the per-encounter cap.
-    const cleric: Character = {
+  it("bless charges last the whole matchup (not per-encounter)", () => {
+    // A level-3 War Domain Cleric has chargesForLevel(3) = 1 bless charge for the run.
+    // Across many save opportunities, only ONE buff_proc should fire from this cleric.
+    const c: Character = {
       id: "c", name: "C", race: "Human", class: "Cleric", role: "Healer",
       specialty: "War Domain",
       stats: { str: 8, dex: 10, con: 12, int: 10, wis: 16, cha: 14 },
-      level: 6, xp: 0, abilityTiers: [1, 2], description: "",
+      level: 3, xp: 0, abilityTiers: [1], description: "",
     };
     const ally: Character = {
-      ...cleric, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
-      stats: { str: 16, dex: 12, con: 14, int: 8, wis: 10, cha: 8 },
+      ...c, id: "a", class: "Fighter", role: "DPS", specialty: "Champion",
+      stats: { str: 16, dex: 14, con: 14, int: 12, wis: 12, cha: 8 },
     };
-    const charMap = new Map([cleric, ally].map((ch) => [ch.id, ch]));
-    const lineup: Lineup = { active: [cleric.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
+    const charMap = new Map([c, ally].map((ch) => [ch.id, ch]));
+    const lineup: Lineup = { active: [c.id, ally.id, ally.id, ally.id], bench: ["x", "y"] };
     const dungeon: Dungeon = {
-      id: "d", name: "T", theme: "fire",
-      encounters: [
-        { id: "e1", type: "puzzle", name: "P1", difficulty: 1, targetStats: ["int"], isBoss: false },
-        { id: "e2", type: "puzzle", name: "P2", difficulty: 1, targetStats: ["int"], isBoss: false },
-      ],
+      id: "d", name: "T", theme: "mechanical",
+      encounters: Array.from({ length: 4 }, (_, i) => ({
+        id: `e${i}`, type: "trap" as const, name: "Trap", difficulty: 1,
+        targetStats: ["dex" as const], isBoss: false,
+      })),
     };
     const events = runDungeon(lineup, charMap, dungeon, createRng(42));
-    // Cleric should generate exactly one "buff" event per encounter (2 total).
-    const buffEvents = events.filter((e) => e.kind === "buff" && e.actorId === "c");
-    expect(buffEvents.length).toBe(2);
-    // The number of buff_proc events from the Cleric should not exceed the per-encounter cap
-    // (3 bless charges per encounter × 2 encounters = at most 6).
-    const procEvents = events.filter((e) => e.kind === "buff_proc" && e.actorId === "c");
-    expect(procEvents.length).toBeLessThanOrEqual(6);
+    const procs = events.filter((e) => e.kind === "buff_proc" && e.actorId === "c" && (e.meta as any)?.buffKind === "bless");
+    expect(procs.length).toBeLessThanOrEqual(1);
   });
 });
 

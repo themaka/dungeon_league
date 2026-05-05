@@ -46,3 +46,31 @@ export function hasRevivify(char: Character): boolean {
     hasAbility("Cleric", "Life Domain", char.level, "Revivify")
   );
 }
+
+export function chargesForLevel(level: number): number {
+  if (level < 3)  return 0;
+  if (level < 7)  return 1;
+  if (level < 13) return 2;
+  if (level < 18) return 3;
+  return 4;
+}
+
+export function hasBless(char: Character): boolean {
+  return char.class === "Cleric" && char.specialty === "War Domain"
+    && hasAbility("Cleric", "War Domain", char.level, "Bless");
+}
+
+export function hasInspiration(char: Character): boolean {
+  return char.class === "Bard" && char.specialty === "Lore"
+    && hasAbility("Bard", "Lore", char.level, "Bardic Inspiration");
+}
+
+export function hasAura(char: Character): boolean {
+  return char.class === "Paladin" && char.specialty === "Devotion"
+    && hasAbility("Paladin", "Devotion", char.level, "Aura of Protection");
+}
+
+export function hasGuidance(char: Character): boolean {
+  return char.class === "Druid" && char.specialty === "Shepherd"
+    && hasAbility("Druid", "Shepherd", char.level, "Guidance");
+}

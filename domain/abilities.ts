@@ -87,6 +87,7 @@ const ABILITIES: Ability[] = [
 
   { name: "Healing Word", tier: 1, className: "Druid", description: "Ranged heal" },
   { name: "Goodberry", tier: 1, className: "Druid", specialty: "Shepherd", description: "Persistent heal token" },
+  { name: "Guidance", tier: 1, className: "Druid", specialty: "Shepherd", description: "+1d4 to ally trap saves" },
   { name: "Wildfire Spirit", tier: 2, className: "Druid", specialty: "Wildfire", description: "Pet that heals or burns" },
   { name: "Wild Shape", tier: 2, className: "Druid", description: "Beast form combat" },
   { name: "Conjure Animals", tier: 3, className: "Druid", description: "Summon allies" },

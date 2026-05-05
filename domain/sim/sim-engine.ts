@@ -5,10 +5,14 @@ import {
   resolveSocial, resolveArcane,
   type EncounterCtx,
 } from "./encounters";
-import { newBuffState } from "./buffs";
-import { hasRevivify } from "./abilities-runtime";
+import { newBuffPools } from "./buffs";
+import {
+  hasRevivify, hasBless, hasInspiration, chargesForLevel,
+} from "./abilities-runtime";
 
 export interface RunDungeonOptions {
+  // Optional override for revivify charges. If omitted, charges are derived from
+  // each Life Domain Cleric's level.
   revivifyCharges?: Record<string, number>;
 }
 
@@ -25,14 +29,29 @@ export function runDungeon(
     hp.set(char.id, 10 + char.stats.con);
   }
 
-  const charges = new Map<string, number>(Object.entries(options.revivifyCharges ?? {}));
+  // Compute buff pools at matchup start; charges last the whole run.
+  const buffs = newBuffPools();
+  for (const char of activeChars) {
+    if (hasBless(char))       buffs.bless.set(char.id, chargesForLevel(char.level));
+    if (hasInspiration(char)) buffs.inspiration.set(char.id, chargesForLevel(char.level));
+    if (hasRevivify(char))    buffs.revivify.set(char.id, chargesForLevel(char.level));
+  }
+
+  // Test override: explicit revivifyCharges replaces level-derived values.
+  if (options.revivifyCharges) {
+    buffs.revivify.clear();
+    for (const [id, n] of Object.entries(options.revivifyCharges)) {
+      buffs.revivify.set(id, n);
+    }
+  }
+
   const allEvents: SimEvent[] = [];
 
   for (const encounter of dungeon.encounters) {
     const alive = activeChars.filter((c) => (hp.get(c.id) ?? 0) > 0);
     if (alive.length === 0) break;
 
-    const ctx: EncounterCtx = { rng, hp, buffs: newBuffState() };
+    const ctx: EncounterCtx = { rng, hp, buffs };
 
     let events: SimEvent[] = [];
     switch (encounter.type) {
@@ -47,10 +66,10 @@ export function runDungeon(
 
     // Post-encounter: attempt revivify if anyone died and a Life Domain Cleric is alive with charges
     const cleric = activeChars.find((c) => hasRevivify(c) && (hp.get(c.id) ?? 0) > 0);
-    if (cleric && (charges.get(cleric.id) ?? 0) > 0) {
+    if (cleric && (buffs.revivify.get(cleric.id) ?? 0) > 0) {
       const dead = events.find((e) => e.kind === "death");
       if (dead) {
-        charges.set(cleric.id, (charges.get(cleric.id) ?? 0) - 1);
+        buffs.revivify.set(cleric.id, (buffs.revivify.get(cleric.id) ?? 0) - 1);
         hp.set(dead.actorId, 5);
         allEvents.push({
           kind: "revivify", encounterId: encounter.id,
