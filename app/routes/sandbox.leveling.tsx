@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Form } from "react-router";
 import { ProceduralSource } from "domain/content/procedural-source";
 import { runDungeon } from "domain/sim/sim-engine";
@@ -8,7 +8,7 @@ import { applyPreset } from "domain/presets";
 import { ALL_THEMES } from "domain/themes";
 import { ROLE_XP_EVENTS, XP_THRESHOLDS } from "domain/leveling";
 import { isCoreEventForSpecialty } from "domain/specialties";
-import type { Character, Lineup, Role, SimEvent } from "domain/types";
+import type { Character, EventKind, Lineup, Role, SimEvent } from "domain/types";
 import type { Route } from "./+types/sandbox.leveling";
 
 type XpMode = "current" | "broadened" | "nobonus" | "nobonus_util" | "milestone";
@@ -137,6 +137,8 @@ function levelFor(xp: number, scaleFactor: number, max = 20): number {
   return lvl;
 }
 
+type EventTally = Partial<Record<EventKind, { count: number; total: number }>>;
+
 interface CharResult {
   externalId: string;
   name: string;
@@ -148,6 +150,8 @@ interface CharResult {
   totalPoints: number;
   totalXp: number;
   level: number;
+  events: EventTally;
+  bossKills: number;
 }
 
 interface SimResult {
@@ -206,6 +210,8 @@ function runSim(params: SimParams): SimResult {
         totalPoints: 0,
         totalXp: 0,
         level: 0,
+        events: {},
+        bossKills: 0,
       });
     }
   }
@@ -233,6 +239,14 @@ function runSim(params: SimParams): SimResult {
           r.matchupsPlayed += 1;
           r.totalPoints += cs?.totalPoints ?? 0;
           r.totalXp += xpFromMatchup(ch, events, params);
+          for (const e of events) {
+            if (e.actorId !== ch.id) continue;
+            const slot = r.events[e.kind] ?? { count: 0, total: 0 };
+            slot.count += 1;
+            slot.total += e.amount ?? 0;
+            r.events[e.kind] = slot;
+            if (e.kind === "kill" && e.meta?.boss) r.bossKills += 1;
+          }
         }
         totalMatchups += 1;
       }
@@ -307,10 +321,94 @@ const ROLE_COLORS: Record<Role, string> = {
 
 type SortKey = "totalXp" | "totalPoints" | "level" | "role" | "team" | "name" | "avg";
 
+const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; showTotal?: boolean }[] }[] = [
+  {
+    label: "Combat",
+    kinds: [
+      { kind: "hit", label: "Hits", showTotal: true },
+      { kind: "crit", label: "Crits" },
+      { kind: "kill", label: "Kills" },
+      { kind: "multiattack", label: "Multiattacks", showTotal: true },
+      { kind: "sneak_attack", label: "Sneak attacks", showTotal: true },
+      { kind: "smite", label: "Smites", showTotal: true },
+      { kind: "rage", label: "Rages" },
+      { kind: "arcane_surge", label: "Arcane surges" },
+    ],
+  },
+  {
+    label: "Defense",
+    kinds: [
+      { kind: "damage_taken", label: "Damage taken", showTotal: true },
+      { kind: "block", label: "Blocks" },
+      { kind: "taunt", label: "Taunts" },
+      { kind: "save_pass", label: "Saves passed" },
+      { kind: "save_fail", label: "Saves failed" },
+      { kind: "ko", label: "KOs" },
+      { kind: "death", label: "Deaths" },
+    ],
+  },
+  {
+    label: "Support",
+    kinds: [
+      { kind: "heal", label: "Heals", showTotal: true },
+      { kind: "buff", label: "Buffs cast" },
+      { kind: "buff_proc", label: "Buff procs" },
+      { kind: "revivify", label: "Revivifies" },
+      { kind: "channel", label: "Channels" },
+      { kind: "dispel", label: "Dispels" },
+    ],
+  },
+  {
+    label: "Skill",
+    kinds: [
+      { kind: "disarm_trap", label: "Traps disarmed" },
+      { kind: "find_treasure", label: "Treasures found" },
+      { kind: "persuade", label: "Persuades" },
+      { kind: "deceive", label: "Deceives" },
+      { kind: "intimidate", label: "Intimidates" },
+    ],
+  },
+];
+
+function StatBlock({ char }: { char: CharResult }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", padding: "0.75rem", background: "var(--parchment-dark, #f4ecd8)" }}>
+      {STAT_GROUPS.map((g) => {
+        const rows = g.kinds
+          .map((k) => {
+            const tally = char.events[k.kind];
+            if (!tally || tally.count === 0) return null;
+            return { ...k, count: tally.count, total: tally.total };
+          })
+          .filter(Boolean) as { kind: EventKind; label: string; showTotal?: boolean; count: number; total: number }[];
+        if (rows.length === 0) return null;
+        return (
+          <div key={g.label}>
+            <div style={{ fontWeight: "bold", fontSize: "0.85rem", marginBottom: "0.25rem" }}>{g.label}</div>
+            {rows.map((r) => (
+              <div key={r.kind} style={{ fontSize: "0.85rem", display: "flex", justifyContent: "space-between" }}>
+                <span>
+                  {r.label}
+                  {r.kind === "kill" && char.bossKills > 0 ? ` (${char.bossKills} boss)` : ""}
+                </span>
+                <span style={{ color: "var(--ink-light)" }}>
+                  {r.count}
+                  {r.showTotal ? ` · ${Math.round(r.total)}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Sandbox({ loaderData }: Route.ComponentProps) {
   const { params, result } = loaderData;
   const [sortKey, setSortKey] = useState<SortKey>("totalXp");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filtered = params.includeBench
     ? result.roster
@@ -456,21 +554,47 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
           </tr>
         </thead>
         <tbody>
-          {sorted.map((r) => (
-            <tr key={r.externalId}>
-              <td><span style={{ background: "var(--parchment-dark)", padding: "0.1rem 0.4rem", borderRadius: 4, fontSize: "0.8rem" }}>T{r.teamIdx + 1}</span></td>
-              <td>{r.name}</td>
-              <td style={{ fontSize: "0.85rem", color: "var(--ink-light)" }}>{r.className} · {r.specialty}</td>
-              <td><span className={`badge badge-${r.role.toLowerCase()}`}>{r.role}</span></td>
-              <td style={{ textAlign: "right", fontWeight: "bold" }}>{r.level}</td>
-              <td style={{ textAlign: "right" }}>{r.totalXp}</td>
-              <td style={{ textAlign: "right" }}>{r.totalPoints.toFixed(1)}</td>
-              <td style={{ textAlign: "right" }}>
-                {r.matchupsPlayed > 0 ? (r.totalPoints / r.matchupsPlayed).toFixed(1) : "—"}
-              </td>
-              <td style={{ textAlign: "right", color: "var(--ink-light)" }}>{r.matchupsPlayed}</td>
-            </tr>
-          ))}
+          {sorted.map((r) => {
+            const isOpen = expandedId === r.externalId;
+            return (
+              <Fragment key={r.externalId}>
+                <tr>
+                  <td><span style={{ background: "var(--parchment-dark)", padding: "0.1rem 0.4rem", borderRadius: 4, fontSize: "0.8rem" }}>T{r.teamIdx + 1}</span></td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isOpen ? null : r.externalId)}
+                      disabled={r.matchupsPlayed === 0}
+                      style={{
+                        background: "none", border: "none", padding: 0,
+                        cursor: r.matchupsPlayed === 0 ? "default" : "pointer",
+                        font: "inherit", color: "inherit", textAlign: "left",
+                      }}
+                    >
+                      <span style={{ color: "var(--ink-light)", fontSize: "0.8rem" }}>{isOpen ? "▼ " : r.matchupsPlayed > 0 ? "▶ " : "  "}</span>
+                      {r.name}
+                    </button>
+                  </td>
+                  <td style={{ fontSize: "0.85rem", color: "var(--ink-light)" }}>{r.className} · {r.specialty}</td>
+                  <td><span className={`badge badge-${r.role.toLowerCase()}`}>{r.role}</span></td>
+                  <td style={{ textAlign: "right", fontWeight: "bold" }}>{r.level}</td>
+                  <td style={{ textAlign: "right" }}>{r.totalXp}</td>
+                  <td style={{ textAlign: "right" }}>{r.totalPoints.toFixed(1)}</td>
+                  <td style={{ textAlign: "right" }}>
+                    {r.matchupsPlayed > 0 ? (r.totalPoints / r.matchupsPlayed).toFixed(1) : "—"}
+                  </td>
+                  <td style={{ textAlign: "right", color: "var(--ink-light)" }}>{r.matchupsPlayed}</td>
+                </tr>
+                {isOpen && (
+                  <tr>
+                    <td colSpan={9} style={{ padding: 0 }}>
+                      <StatBlock char={r} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
