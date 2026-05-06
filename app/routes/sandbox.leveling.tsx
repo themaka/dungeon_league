@@ -322,16 +322,16 @@ const ROLE_COLORS: Record<Role, string> = {
 
 type SortKey = "totalXp" | "totalPoints" | "level" | "role" | "team" | "name" | "avg";
 
-const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; showTotal?: boolean }[] }[] = [
+const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; unit?: "dmg" | "hp" }[] }[] = [
   {
     label: "Combat",
     kinds: [
-      { kind: "hit", label: "Hits", showTotal: true },
+      { kind: "hit", label: "Hits", unit: "dmg" },
       { kind: "crit", label: "Crits" },
       { kind: "kill", label: "Kills" },
-      { kind: "multiattack", label: "Multiattacks", showTotal: true },
-      { kind: "sneak_attack", label: "Sneak attacks", showTotal: true },
-      { kind: "smite", label: "Smites", showTotal: true },
+      { kind: "multiattack", label: "Multiattacks", unit: "dmg" },
+      { kind: "sneak_attack", label: "Sneak attacks", unit: "dmg" },
+      { kind: "smite", label: "Smites", unit: "dmg" },
       { kind: "rage", label: "Rages" },
       { kind: "arcane_surge", label: "Arcane surges" },
     ],
@@ -339,7 +339,7 @@ const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; sho
   {
     label: "Defense",
     kinds: [
-      { kind: "damage_taken", label: "Damage taken", showTotal: true },
+      { kind: "damage_taken", label: "Damage taken", unit: "dmg" },
       { kind: "block", label: "Blocks" },
       { kind: "taunt", label: "Taunts" },
       { kind: "save_pass", label: "Saves passed" },
@@ -351,7 +351,7 @@ const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; sho
   {
     label: "Support",
     kinds: [
-      { kind: "heal", label: "Heals", showTotal: true },
+      { kind: "heal", label: "Heals", unit: "hp" },
       { kind: "buff", label: "Buffs cast" },
       { kind: "buff_proc", label: "Buff procs" },
       { kind: "revivify", label: "Revivifies" },
@@ -388,7 +388,7 @@ function StatBlock({ char }: { char: CharResult }) {
               if (!tally || tally.count === 0) return null;
               return { ...k, count: tally.count, total: tally.total, points: tally.points };
             })
-            .filter(Boolean) as { kind: EventKind; label: string; showTotal?: boolean; count: number; total: number; points: number }[];
+            .filter(Boolean) as { kind: EventKind; label: string; unit?: "dmg" | "hp"; count: number; total: number; points: number }[];
           if (rows.length === 0) return null;
           const groupPoints = rows.reduce((a, r) => a + r.points, 0);
           return (
@@ -405,7 +405,7 @@ function StatBlock({ char }: { char: CharResult }) {
                   </span>
                   <span style={{ color: "var(--ink-light)", textAlign: "right" }}>
                     {r.count}
-                    {r.showTotal ? ` · ${Math.round(r.total)}` : ""}
+                    {r.unit ? ` (${Math.round(r.total)} ${r.unit})` : ""}
                   </span>
                   <span style={{ color: r.points >= 0 ? "var(--ink)" : "var(--accent)", textAlign: "right", minWidth: "3.5em" }}>
                     {r.points >= 0 ? "+" : ""}{r.points.toFixed(1)}
