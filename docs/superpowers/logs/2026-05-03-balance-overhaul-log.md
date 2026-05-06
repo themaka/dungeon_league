@@ -104,6 +104,29 @@ From the final review, deferred to follow-up sessions:
 - **Service test infrastructure** — 15 service tests need a Postgres test DB or Prisma mocking layer. Until then CI can't validate the service-layer wiring.
 - **Champions preset harness** — Balance harness only runs the standard preset. A second pass with `applyPreset("champions")` would verify level-20 characters with all 8 ability tiers don't break encounter resolution.
 
+## Leveling/Scoring Coupling Investigation (open)
+
+Playtest surfaced that XP and scoring use independent formulas, so a Vengeance Paladin Tank who out-scored a Champion Fighter DPS was nevertheless 4 levels below them. Root cause: XP is gated by `ROLE_XP_EVENTS[role]`, while scoring counts `role_core` plus a `specialty 0.25×` bonus. Off-role specialties (Vengeance Paladin Tank, Berserker Tank, Wildfire Druid Healer, Hexblade Tank, Swords Bard, Assassin Rogue Utility) score from two buckets but XP from one. Today's correlation between season points and season XP is **r=0.40**.
+
+**Tools landed (no production code change yet):**
+
+- `scripts/leveling-comparison.ts` — runs the standard preset (5 seasons × 10 weeks × 6 teams) under five XP variants and prints per-role mean XP, Pearson correlation, and the off-role specialty outliers. Run via `npx tsx scripts/leveling-comparison.ts`.
+- `app/routes/sandbox.leveling.tsx` (`/sandbox/leveling`) — interactive web sandbox with the same five variants exposed as dials (charSeed, team count, seasons, weeks, xpMode, specialty/utility bonus multipliers, milestone XP, scaleFactor), full league roster sortable by team / role / level / XP / pts / avg, and a CSV export so two runs can be diffed in a spreadsheet.
+
+**Five variants gameplayed (Standard preset, 120 active char-seasons):**
+
+| Mode | Mean XP | CV | r(pts↔XP) | Tank | Healer | DPS | Utility |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Current | 78.9 | 0.43 | 0.40 | 89 | 80 | 95 | 26 |
+| Broadened (role OR specialty, 1.5× on specialty) | 95.4 | 0.48 | 0.62 | 150 | 102 | 96 | 56 |
+| No-bonus (specialty 1.5× only when role+specialty match) | 88.6 | 0.42 | 0.61 | 125 | 94 | 96 | 43 |
+| No-bonus + Utility lift (1.5× on Util role events) | 91.2 | **0.37** | **0.62** | 125 | 94 | 96 | 56 |
+| Milestone (flat XP/matchup) | 80.0 | 0.00 | 0.00 | 80 | 80 | 80 | 80 |
+
+Best mode by both correlation and evenness so far: **No-bonus + Utility lift** (Pearson r=0.624, CV=0.37 — leveling is *more* even than current while tracking points better). Vengeance/Berserker Tanks land at L8 instead of L5; Tank XP rises to 1.4× current instead of 1.7× (Broadened). Utility moves from 26→56, still trailing the other roles at 95+. Pushing the Utility multiplier higher (e.g. 2×) is the next dial to explore in the sandbox.
+
+**Open question:** which rule to commit to `domain/leveling.ts`. Decision deferred until the sandbox has produced a configuration the user is happy with.
+
 ## Manual Verification Checklist
 
 Before merging, recommend:
