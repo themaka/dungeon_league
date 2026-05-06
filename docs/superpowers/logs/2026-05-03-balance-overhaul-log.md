@@ -96,6 +96,8 @@ From the final review, deferred to follow-up sessions:
 - **I1: Sorcerer specialty differentiation** — `Draconic` and `Wild Magic` have identical `coreEvents` `["hit","arcane_surge"]`. Need distinct mechanics for Wild Magic's "high variance" theme (e.g., random bonus/penalty events).
 - **I3: Hardcoded draft slot count** — `services/draft-service.server.ts:93` has `totalRosterSlots = 36`. Should be `settings.teamCount * settings.rosterSize`.
 - **I4: `playoffTeams` setting unused** — Declared in LeagueSettings, never consulted; bracket size always 4. Either drive the bracket from this setting or remove it.
+- **Consolation matchups removed** — 5v6 (semis week), 3rd-place playoff, and 5v6-rematch (finals week) were stripped to fix the finals-scheduling bug. To bring them back, add a `bracketRound: "regular" | "semifinal" | "consolation_5_6" | "final" | "consolation_3_4"` column on the Matchup model and filter the finals query by `bracketRound === "semifinal"`. While they're missing, 5th and 6th place teams sit idle during playoff weeks.
+- **`playoffWeeks` setting is informational only** — `totalWeeks` is hardcoded to `seasonWeeks + 2` (matching the 2-round bracket). Restoring the setting requires implementing additional bracket rounds (e.g., quarterfinals for 8-team leagues, or "best of N" formats).
 - **I5: `targetLevel` setting unused** — XP scale formula is `10 / seasonWeeks`, ignores targetLevel. Veterans preset (12 weeks, target level 16) currently gets less XP than standard. Formula should derive from `(targetLevelXP − startingLevelXP) / seasonWeeks`.
 - **I6: Order-fragile revivify_save milestone** — Currently relies on death events being pushed before revivify in the events array. Add an explicit two-pass approach.
 - **M1: Highlight template variety** — All 15 new event kinds have only 1 template each (vs 2 for the original 10). Consider 2-3 per kind for less repetition.
@@ -112,6 +114,48 @@ Before merging, recommend:
 3. `npm run dev`; create a Champions league and try a draft to confirm 72 characters appear, all level 20 with all 8 ability tiers showing on cards.
 4. Try a Quick Play league; advance through 5 weeks; confirm characters gain XP and level up between matchups.
 5. Watch a matchup play-by-play; confirm new event icons render (smite, sneak_attack, multiattack, revivify especially).
+
+## Manual-Testing Phase Fixes (Post-Merge-Candidate)
+
+After the initial 35-commit branch was declared merge-ready, manual testing surfaced four issues that had to be fixed before the app actually played end-to-end. All landed on the same branch.
+
+### Pre-generate dungeons at matchup creation (`35ac88e`)
+
+**Symptom:** League home page showed `Team A vs Team B` with no theme/name info for upcoming matchups. Section 3 of the spec explicitly calls for theme to be visible before lineup decisions ("if it's arcane-heavy, you want casters active") — but `dungeonData` was only populated AFTER the sim ran inside `advanceWeek`, so upcoming matchups had `null` data.
+
+**Fix:** Generate the dungeon at matchup creation time using deterministic seed `seedFromIds(leagueId, week, matchupId, "theme"|"dungeon")`. `advanceWeek` now reads `matchup.dungeonData` instead of generating. Applied across regular-season scheduling AND all 5 playoff matchup-create sites. UI updated to show theme badge (color-coded), dungeon name, and encounter count under each upcoming matchup card.
+
+**Side benefit:** Re-running a week now produces deterministic dungeons (the dungeon is fixed at create time, not regenerated each advance call).
+
+### Schedule didn't fill `seasonWeeks` (`2eb53e0`, partial)
+
+**Symptom:** Selecting Standard preset (10-week season), the league stalled at week 6 with "no matchups scheduled" and no advance button.
+
+**Root cause:** `generateRegularSeason(teamIds)` returns `N-1` rounds for N teams (5 rounds for 6 teams). `createLeague` capped scheduling at `Math.min(schedule.length, settings.seasonWeeks)` = 5 weeks regardless of the preset's `seasonWeeks=10`. After week 5 the league entered `phase="regular"` at week 6 with nothing to advance to.
+
+**Fix:** Cycle the round-robin to fill `seasonWeeks`, flipping home/away on alternating cycles for variety. Standard now plays each opponent twice (home + away) across 10 weeks; Epic cycles 4 times across 20 weeks; Veterans cycles 2.4 times across 12 weeks; Quick Play stops at one cycle (5 weeks).
+
+### `totalWeeks` overshoot stranded the league at the last playoff week (`2eb53e0`, partial)
+
+**Symptom:** Standard preset (`playoffWeeks=3`) produced an empty week 13 the league couldn't advance past.
+
+**Root cause:** The bracket implementation only has 2 rounds (semis + finals) but `totalWeeks = seasonWeeks + playoffWeeks`. With `playoffWeeks=3`, `totalWeeks=13` but the playoff bracket only fills weeks 11-12, leaving week 13 dead.
+
+**Fix:** Hardcoded `totalWeeks = seasonWeeks + 2` to match the actual 2-round bracket. The `playoffWeeks` setting is now informational only — true 3+ round brackets are deferred until a proper bracket-round implementation lands.
+
+### Quick Play finals never scheduled (`2eb53e0`, partial + `ab772f0`)
+
+**Symptom:** Quick Play (`seasonWeeks=5`, `playoffWeeks=2`) reached week 6 semis correctly, but week 7 finals were never created and no champion was declared.
+
+**Root cause (two layers):**
+1. Old condition: `if (week === seasonWeeks + 1 && newPhase === "playoffs")`. After fixing `totalWeeks` (above), `newPhase` for Quick Play after week 6 became `"complete"`, so the guard never fired.
+2. Even with the `newPhase` check removed, the post-week-6 query pulled `prisma.matchup.findMany({ where: { leagueId, week: 6 } })` and got 3 matchups (2 semis + 1 5v6 consolation). `winnerIds.length === 3`, so `if (winnerIds.length === 2)` skipped finals scheduling.
+
+**Fix (commit `2eb53e0`):** Removed the `newPhase === "playoffs"` guard.
+
+**Fix (commit `ab772f0`):** Stripped ALL consolation matchups for now — the 5v6 at semis week, the 3rd-place playoff, and the 5v6 rematch at finals week. The finals query now sees exactly 2 semi matchups → 2 winners → finals scheduled correctly. 5th and 6th place teams sit idle during playoffs.
+
+**Defer:** Consolation games to return with a `bracketRound` field on the Matchup schema so the finals scheduler can filter by round identity rather than guessing from team membership. Tracked as a follow-up.
 
 ## Architectural Notes
 
