@@ -39,6 +39,7 @@ export async function getDraftState(leagueId: string) {
 
   return {
     leagueId,
+    leagueName: league.name,
     currentPick,
     totalPicks: draftOrder.length,
     draftOrder: draftOrder.map((d) => ({

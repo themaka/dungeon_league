@@ -18,7 +18,7 @@ export function LineupEditor({ roster, active, bench, onSwap, readOnly }: Lineup
         <h3>Active (4)</h3>
         {activeChars.map((char: any) => (
           <div key={char.id} style={{ position: "relative" }}>
-            <CharacterCard character={char} compact />
+            <CharacterCard character={char} compact expandable />
             {!readOnly && benchChars.length > 0 && (
               <div style={{ marginTop: "-0.5rem", marginBottom: "0.5rem" }}>
                 {benchChars.map((bc: any) => (

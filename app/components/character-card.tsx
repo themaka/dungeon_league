@@ -23,9 +23,10 @@ interface CharacterCardProps {
   onClick?: () => void;
   selected?: boolean;
   compact?: boolean;
+  expandable?: boolean;
 }
 
-export function CharacterCard({ character, onClick, selected, compact }: CharacterCardProps) {
+export function CharacterCard({ character, onClick, selected, compact, expandable }: CharacterCardProps) {
   const roleClass = `badge badge-${character.role.toLowerCase()}`;
   const abilities = character.specialty
     ? unlockedAbilities(
@@ -34,6 +35,43 @@ export function CharacterCard({ character, onClick, selected, compact }: Charact
         character.level,
       )
     : [];
+
+  const details = (
+    <>
+      <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <span>STR {character.stats.str}</span>
+        <span>DEX {character.stats.dex}</span>
+        <span>CON {character.stats.con}</span>
+        <span>INT {character.stats.int}</span>
+        <span>WIS {character.stats.wis}</span>
+        <span>CHA {character.stats.cha}</span>
+      </div>
+
+      {abilities.length > 0 && (
+        <div style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
+          <strong>Abilities:</strong>{" "}
+          {abilities.map((a) => a.name).join(", ")}
+        </div>
+      )}
+
+      {character.scouting && (
+        <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", padding: "0.4rem", background: "var(--parchment-dark, #f4ecd8)", borderRadius: 4 }}>
+          <strong>Scouting:</strong>{" "}
+          avg {character.scouting.avgPoints?.toFixed(1) ?? "?"} pts
+          {character.scouting.specialtyProcRate !== undefined
+            ? ` · proc ${(character.scouting.specialtyProcRate * 100).toFixed(0)}%`
+            : null}
+          {character.scouting.projectedValue !== undefined
+            ? ` · value ${character.scouting.projectedValue}`
+            : null}
+        </div>
+      )}
+
+      <p style={{ fontSize: "0.85rem", marginTop: "0.5rem", fontStyle: "italic" }}>
+        {character.description}
+      </p>
+    </>
+  );
 
   return (
     <div
@@ -55,41 +93,15 @@ export function CharacterCard({ character, onClick, selected, compact }: Charact
         {` · L${character.level}`}
       </div>
 
-      {!compact && (
-        <>
-          <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <span>STR {character.stats.str}</span>
-            <span>DEX {character.stats.dex}</span>
-            <span>CON {character.stats.con}</span>
-            <span>INT {character.stats.int}</span>
-            <span>WIS {character.stats.wis}</span>
-            <span>CHA {character.stats.cha}</span>
-          </div>
+      {!compact && details}
 
-          {abilities.length > 0 && (
-            <div style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>
-              <strong>Abilities:</strong>{" "}
-              {abilities.map((a) => a.name).join(", ")}
-            </div>
-          )}
-
-          {character.scouting && (
-            <div style={{ fontSize: "0.8rem", marginTop: "0.5rem", padding: "0.4rem", background: "var(--parchment-dark, #f4ecd8)", borderRadius: 4 }}>
-              <strong>Scouting:</strong>{" "}
-              avg {character.scouting.avgPoints?.toFixed(1) ?? "?"} pts
-              {character.scouting.specialtyProcRate !== undefined
-                ? ` · proc ${(character.scouting.specialtyProcRate * 100).toFixed(0)}%`
-                : null}
-              {character.scouting.projectedValue !== undefined
-                ? ` · value ${character.scouting.projectedValue}`
-                : null}
-            </div>
-          )}
-
-          <p style={{ fontSize: "0.85rem", marginTop: "0.5rem", fontStyle: "italic" }}>
-            {character.description}
-          </p>
-        </>
+      {compact && expandable && (
+        <details style={{ marginTop: "0.4rem" }} onClick={(e) => e.stopPropagation()}>
+          <summary style={{ fontSize: "0.8rem", color: "var(--ink-light)", cursor: "pointer" }}>
+            Details
+          </summary>
+          {details}
+        </details>
       )}
     </div>
   );
