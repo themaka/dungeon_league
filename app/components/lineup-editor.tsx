@@ -6,9 +6,10 @@ interface LineupEditorProps {
   bench: string[];
   onSwap: (activeId: string, benchId: string) => void;
   readOnly?: boolean;
+  seasonStats?: Record<string, { total: number; games: number; lastGame: number | null }>;
 }
 
-export function LineupEditor({ roster, active, bench, onSwap, readOnly }: LineupEditorProps) {
+export function LineupEditor({ roster, active, bench, onSwap, readOnly, seasonStats }: LineupEditorProps) {
   const activeChars = active.map((id) => roster.find((c) => c.externalId === id)).filter(Boolean);
   const benchChars = bench.map((id) => roster.find((c) => c.externalId === id)).filter(Boolean);
 
@@ -18,7 +19,7 @@ export function LineupEditor({ roster, active, bench, onSwap, readOnly }: Lineup
         <h3>Active (4)</h3>
         {activeChars.map((char: any) => (
           <div key={char.id} style={{ position: "relative" }}>
-            <CharacterCard character={char} compact expandable />
+            <CharacterCard character={char} compact expandable seasonStats={seasonStats?.[char.externalId]} />
             {!readOnly && benchChars.length > 0 && (
               <div style={{ marginTop: "-0.5rem", marginBottom: "0.5rem" }}>
                 {benchChars.map((bc: any) => (
@@ -39,7 +40,7 @@ export function LineupEditor({ roster, active, bench, onSwap, readOnly }: Lineup
       <div>
         <h3>Bench (2)</h3>
         {benchChars.map((char: any) => (
-          <CharacterCard key={char.id} character={char} compact />
+          <CharacterCard key={char.id} character={char} compact expandable seasonStats={seasonStats?.[char.externalId]} />
         ))}
       </div>
     </div>

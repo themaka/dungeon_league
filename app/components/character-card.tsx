@@ -24,9 +24,10 @@ interface CharacterCardProps {
   selected?: boolean;
   compact?: boolean;
   expandable?: boolean;
+  seasonStats?: { total: number; games: number; lastGame: number | null };
 }
 
-export function CharacterCard({ character, onClick, selected, compact, expandable }: CharacterCardProps) {
+export function CharacterCard({ character, onClick, selected, compact, expandable, seasonStats }: CharacterCardProps) {
   const roleClass = `badge badge-${character.role.toLowerCase()}`;
   const abilities = character.specialty
     ? unlockedAbilities(
@@ -92,6 +93,16 @@ export function CharacterCard({ character, onClick, selected, compact, expandabl
         {character.specialty ? ` · ${character.specialty}` : null}
         {` · L${character.level}`}
       </div>
+
+      {seasonStats && seasonStats.games > 0 && (
+        <div style={{ fontSize: "0.8rem", marginTop: "0.3rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <span><strong>Season:</strong> {seasonStats.total.toFixed(1)} pts</span>
+          <span style={{ color: "var(--ink-light)" }}>
+            · {(seasonStats.total / seasonStats.games).toFixed(1)}/game
+            {seasonStats.lastGame !== null ? ` · last ${seasonStats.lastGame.toFixed(1)}` : ""}
+          </span>
+        </div>
+      )}
 
       {!compact && details}
 
