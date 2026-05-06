@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { Form } from "react-router";
 import { ProceduralSource } from "domain/content/procedural-source";
 import { runDungeon } from "domain/sim/sim-engine";
-import { score } from "domain/scoring";
+import { pointsForEvent, score } from "domain/scoring";
 import { createRng, seedFromIds } from "domain/rng";
 import { applyPreset } from "domain/presets";
 import { ALL_THEMES } from "domain/themes";
@@ -137,7 +137,7 @@ function levelFor(xp: number, scaleFactor: number, max = 20): number {
   return lvl;
 }
 
-type EventTally = Partial<Record<EventKind, { count: number; total: number }>>;
+type EventTally = Partial<Record<EventKind, { count: number; total: number; points: number }>>;
 
 interface CharResult {
   externalId: string;
@@ -241,9 +241,10 @@ function runSim(params: SimParams): SimResult {
           r.totalXp += xpFromMatchup(ch, events, params);
           for (const e of events) {
             if (e.actorId !== ch.id) continue;
-            const slot = r.events[e.kind] ?? { count: 0, total: 0 };
+            const slot = r.events[e.kind] ?? { count: 0, total: 0, points: 0 };
             slot.count += 1;
             slot.total += e.amount ?? 0;
+            slot.points += pointsForEvent(e, ch);
             r.events[e.kind] = slot;
             if (e.kind === "kill" && e.meta?.boss) r.bossKills += 1;
           }
@@ -371,35 +372,56 @@ const STAT_GROUPS: { label: string; kinds: { kind: EventKind; label: string; sho
 ];
 
 function StatBlock({ char }: { char: CharResult }) {
+  const summedEventPoints = Object.values(char.events).reduce(
+    (acc, t) => acc + (t?.points ?? 0),
+    0,
+  );
+  const milestonePoints = char.totalPoints - summedEventPoints;
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", padding: "0.75rem", background: "var(--parchment-dark, #f4ecd8)" }}>
-      {STAT_GROUPS.map((g) => {
-        const rows = g.kinds
-          .map((k) => {
-            const tally = char.events[k.kind];
-            if (!tally || tally.count === 0) return null;
-            return { ...k, count: tally.count, total: tally.total };
-          })
-          .filter(Boolean) as { kind: EventKind; label: string; showTotal?: boolean; count: number; total: number }[];
-        if (rows.length === 0) return null;
-        return (
-          <div key={g.label}>
-            <div style={{ fontWeight: "bold", fontSize: "0.85rem", marginBottom: "0.25rem" }}>{g.label}</div>
-            {rows.map((r) => (
-              <div key={r.kind} style={{ fontSize: "0.85rem", display: "flex", justifyContent: "space-between" }}>
-                <span>
-                  {r.label}
-                  {r.kind === "kill" && char.bossKills > 0 ? ` (${char.bossKills} boss)` : ""}
-                </span>
-                <span style={{ color: "var(--ink-light)" }}>
-                  {r.count}
-                  {r.showTotal ? ` · ${Math.round(r.total)}` : ""}
-                </span>
+    <div style={{ padding: "0.75rem", background: "var(--parchment-dark, #f4ecd8)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
+        {STAT_GROUPS.map((g) => {
+          const rows = g.kinds
+            .map((k) => {
+              const tally = char.events[k.kind];
+              if (!tally || tally.count === 0) return null;
+              return { ...k, count: tally.count, total: tally.total, points: tally.points };
+            })
+            .filter(Boolean) as { kind: EventKind; label: string; showTotal?: boolean; count: number; total: number; points: number }[];
+          if (rows.length === 0) return null;
+          const groupPoints = rows.reduce((a, r) => a + r.points, 0);
+          return (
+            <div key={g.label}>
+              <div style={{ fontWeight: "bold", fontSize: "0.85rem", marginBottom: "0.25rem", display: "flex", justifyContent: "space-between" }}>
+                <span>{g.label}</span>
+                <span style={{ color: "var(--ink-light)" }}>{groupPoints.toFixed(1)} pts</span>
               </div>
-            ))}
-          </div>
-        );
-      })}
+              {rows.map((r) => (
+                <div key={r.kind} style={{ fontSize: "0.85rem", display: "grid", gridTemplateColumns: "1fr auto auto", gap: "0.5rem" }}>
+                  <span>
+                    {r.label}
+                    {r.kind === "kill" && char.bossKills > 0 ? ` (${char.bossKills} boss)` : ""}
+                  </span>
+                  <span style={{ color: "var(--ink-light)", textAlign: "right" }}>
+                    {r.count}
+                    {r.showTotal ? ` · ${Math.round(r.total)}` : ""}
+                  </span>
+                  <span style={{ color: r.points >= 0 ? "var(--ink)" : "var(--accent)", textAlign: "right", minWidth: "3.5em" }}>
+                    {r.points >= 0 ? "+" : ""}{r.points.toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ marginTop: "0.75rem", paddingTop: "0.5rem", borderTop: "1px solid var(--ink-light)", fontSize: "0.85rem", display: "flex", justifyContent: "space-between" }}>
+        <span style={{ color: "var(--ink-light)" }}>
+          Event points: {summedEventPoints.toFixed(1)} · Milestones (run bonuses): {milestonePoints.toFixed(1)}
+        </span>
+        <strong>Total: {char.totalPoints.toFixed(1)}</strong>
+      </div>
     </div>
   );
 }
