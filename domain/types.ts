@@ -146,6 +146,7 @@ export interface Highlight {
   actorIds: string[];
   description: string;
   importance: "high" | "medium" | "low";
+  points?: number;
 }
 
 export interface Matchup {

@@ -60,6 +60,19 @@ function basePointsFor(event: SimEvent): number {
   return calc;
 }
 
+export function pointsForEvent(event: SimEvent, character: Character): number {
+  const base = basePointsFor(event);
+  let total = base;
+  const core = ROLE_CORE_EVENTS[character.role];
+  const secondary = ROLE_SECONDARY_EVENTS[character.role];
+  if (core?.has(event.kind)) total += base * ROLE_CORE_MULT;
+  else if (secondary?.has(event.kind)) total += base * ROLE_SECONDARY_MULT;
+  if (isCoreEventForSpecialty(character.specialty, event.kind)) {
+    total += base * SPECIALTY_BONUS_MULT;
+  }
+  return total;
+}
+
 export function score(events: SimEvent[], roster: Character[]): ScoreResult {
   const charMap = new Map(roster.map((c) => [c.id, c]));
   const scores = new Map<string, CharacterScore>();
