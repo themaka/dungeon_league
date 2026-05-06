@@ -3,6 +3,22 @@ import { getLeague, advanceWeek } from "services/league-service.server";
 import { StandingsTable } from "~/components/standings-table";
 import type { Route } from "./+types/leagues.$id";
 
+const THEME_COLORS: Record<string, string> = {
+  undead:     "#5a4e6e",
+  fire:       "#c1502e",
+  shadow:     "#4a4153",
+  arcane:     "#3e7b8a",
+  demonic:    "#8b1a1a",
+  nature:     "#4a7a3a",
+  mechanical: "#6b6052",
+  aquatic:    "#3a6a8a",
+  draconic:   "#a06030",
+  ice:        "#6a8aa0",
+};
+function themeColor(theme: string): string {
+  return THEME_COLORS[theme] ?? "#7a7a7a";
+}
+
 export async function loader({ params }: Route.LoaderArgs) {
   const league = await getLeague(params.id);
   return { league };
@@ -62,15 +78,46 @@ export default function LeagueHome({ loaderData }: Route.ComponentProps) {
                 const home = league.teams.find((t) => t.id === m.homeTeamId);
                 const away = league.teams.find((t) => t.id === m.awayTeamId);
                 return (
-                  <div key={m.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>{home?.name ?? "?"}</span>
-                    <span style={{ color: "var(--ink-light)" }}>vs</span>
-                    <span>{away?.name ?? "?"}</span>
-                    {m.winnerId && (
-                      <Link to={`/leagues/${league.id}/matchups/${m.id}`} className="btn" style={{ fontSize: "0.85rem", padding: "0.3rem 0.8rem" }}>
-                        View
-                      </Link>
-                    )}
+                  <div key={m.id} className="card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>{home?.name ?? "?"}</span>
+                      <span style={{ color: "var(--ink-light)" }}>vs</span>
+                      <span>{away?.name ?? "?"}</span>
+                      {m.winnerId && (
+                        <Link to={`/leagues/${league.id}/matchups/${m.id}`} className="btn" style={{ fontSize: "0.85rem", padding: "0.3rem 0.8rem" }}>
+                          View
+                        </Link>
+                      )}
+                    </div>
+                    {(() => {
+                      const d = m.dungeonData as any;
+                      if (!d) return null;
+                      return (
+                        <div style={{
+                          marginTop: "0.5rem",
+                          paddingTop: "0.5rem",
+                          borderTop: "1px solid var(--parchment-dark)",
+                          fontSize: "0.85rem",
+                          color: "var(--ink-light)",
+                          display: "flex",
+                          gap: "0.75rem",
+                          alignItems: "center",
+                        }}>
+                          <span style={{
+                            padding: "0.15rem 0.5rem",
+                            borderRadius: 4,
+                            background: themeColor(d.theme),
+                            color: "#fff",
+                            fontSize: "0.75rem",
+                            fontWeight: "bold",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                          }}>{d.theme}</span>
+                          <span>{d.name}</span>
+                          <span style={{ marginLeft: "auto" }}>{d.encounters?.length ?? 0} encounters</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}

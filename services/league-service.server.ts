@@ -7,11 +7,12 @@ import { score } from "domain/scoring";
 import { generateHighlights } from "domain/highlights";
 import { AIManager, AI_PERSONALITIES } from "domain/ai-manager";
 import { generateRegularSeason } from "domain/schedule";
-import { type Character, type Lineup } from "domain/types";
+import { type Character, type Lineup, type Dungeon } from "domain/types";
 import { applyPreset } from "domain/presets";
 import { runScouting } from "domain/scouting";
 import { applyXpAndLevel, xpFromEvents } from "domain/leveling";
 import type { LeagueSettings, PresetName } from "domain/types";
+import { ALL_THEMES } from "domain/themes";
 
 const connectionString = process.env.DATABASE_URL ?? "postgresql://dungeon:league@localhost:5432/dungeon_league?schema=public";
 const adapter = new PrismaPg({ connectionString });
@@ -91,13 +92,24 @@ export async function createLeague(
 
   const schedule = generateRegularSeason(teamIds);
   for (let weekIdx = 0; weekIdx < Math.min(schedule.length, settings.seasonWeeks); weekIdx++) {
-    for (const matchup of schedule[weekIdx]) {
+    for (let mIdx = 0; mIdx < schedule[weekIdx].length; mIdx++) {
+      const matchup = schedule[weekIdx][mIdx];
+      const week = weekIdx + 1;
+      const matchupId = crypto.randomUUID();
+      const themeRng = createRng(seedFromIds(league.id, String(week), matchupId, "theme"));
+      const theme = themeRng.pick(ALL_THEMES);
+      const dungeonRng = createRng(seedFromIds(league.id, String(week), matchupId, "dungeon"));
+      const dungeon = contentSource.generateDungeon(
+        week, mIdx, dungeonRng, theme, settings.encounterCount,
+      );
       await prisma.matchup.create({
         data: {
+          id: matchupId,
           leagueId: league.id,
-          week: weekIdx + 1,
+          week,
           homeTeamId: matchup.home,
           awayTeamId: matchup.away,
+          dungeonData: dungeon as any,
         },
       });
     }
@@ -146,15 +158,14 @@ export async function advanceWeek(leagueId: string) {
   }
 
   const leagueSettings = league.settings as any;
-  const themes = ["undead", "fire", "shadow", "arcane", "demonic", "nature", "mechanical", "aquatic", "draconic", "ice"];
 
   for (const matchup of matchups) {
     const rng = createRng(seedFromIds(leagueId, String(week), matchup.id));
-    const themeRng = rng.fork("theme");
-    const theme = themes[themeRng.nextInt(0, themes.length - 1)];
-    const dungeon = contentSource.generateDungeon(
-      week, 0, rng.fork("dungeon"), theme, leagueSettings.encounterCount ?? "5-8",
-    );
+    // Dungeon was pre-generated at matchup creation; read it.
+    const dungeon = matchup.dungeonData as unknown as Dungeon;
+    if (!dungeon) {
+      throw new Error(`Matchup ${matchup.id} has no dungeonData; was it created before the pre-generation refactor?`);
+    }
 
     const processTeam = async (team: typeof matchup.homeTeam) => {
       let lineup = await prisma.lineup.findUnique({
@@ -295,16 +306,28 @@ export async function advanceWeek(leagueId: string) {
     const { generatePlayoffMatchups } = await import("domain/schedule");
     const semis = generatePlayoffMatchups(rankedIds, "semifinal");
     for (const m of semis) {
+      const matchupId = crypto.randomUUID();
+      const week = leagueSettings.seasonWeeks + 1;
+      const themeRng = createRng(seedFromIds(leagueId, String(week), matchupId, "theme"));
+      const theme = themeRng.pick(ALL_THEMES);
+      const dungeonRng = createRng(seedFromIds(leagueId, String(week), matchupId, "dungeon"));
+      const dungeon = contentSource.generateDungeon(week, 0, dungeonRng, theme, leagueSettings.encounterCount ?? "5-8");
       await prisma.matchup.create({
-        data: { leagueId, week: leagueSettings.seasonWeeks + 1, homeTeamId: m.home, awayTeamId: m.away },
+        data: { id: matchupId, leagueId, week, homeTeamId: m.home, awayTeamId: m.away, dungeonData: dungeon as any },
       });
     }
 
     // Consolation matchup for eliminated teams (5th vs 6th)
     const eliminated = rankedIds.slice(4);
     if (eliminated.length === 2) {
+      const matchupId = crypto.randomUUID();
+      const week = leagueSettings.seasonWeeks + 1;
+      const themeRng = createRng(seedFromIds(leagueId, String(week), matchupId, "theme"));
+      const theme = themeRng.pick(ALL_THEMES);
+      const dungeonRng = createRng(seedFromIds(leagueId, String(week), matchupId, "dungeon"));
+      const dungeon = contentSource.generateDungeon(week, 0, dungeonRng, theme, leagueSettings.encounterCount ?? "5-8");
       await prisma.matchup.create({
-        data: { leagueId, week: leagueSettings.seasonWeeks + 1, homeTeamId: eliminated[0], awayTeamId: eliminated[1] },
+        data: { id: matchupId, leagueId, week, homeTeamId: eliminated[0], awayTeamId: eliminated[1], dungeonData: dungeon as any },
       });
     }
   }
@@ -325,15 +348,27 @@ export async function advanceWeek(leagueId: string) {
       const { generatePlayoffMatchups } = await import("domain/schedule");
       const finals = generatePlayoffMatchups(winnerIds, "final");
       for (const m of finals) {
+        const matchupId = crypto.randomUUID();
+        const week = leagueSettings.seasonWeeks + 2;
+        const themeRng = createRng(seedFromIds(leagueId, String(week), matchupId, "theme"));
+        const theme = themeRng.pick(ALL_THEMES);
+        const dungeonRng = createRng(seedFromIds(leagueId, String(week), matchupId, "dungeon"));
+        const dungeon = contentSource.generateDungeon(week, 0, dungeonRng, theme, leagueSettings.encounterCount ?? "5-8");
         await prisma.matchup.create({
-          data: { leagueId, week: leagueSettings.seasonWeeks + 2, homeTeamId: m.home, awayTeamId: m.away },
+          data: { id: matchupId, leagueId, week, homeTeamId: m.home, awayTeamId: m.away, dungeonData: dungeon as any },
         });
       }
 
       // Consolation: semi losers play for 3rd place
       if (semiLoserIds.length === 2) {
+        const matchupId = crypto.randomUUID();
+        const week = leagueSettings.seasonWeeks + 2;
+        const themeRng = createRng(seedFromIds(leagueId, String(week), matchupId, "theme"));
+        const theme = themeRng.pick(ALL_THEMES);
+        const dungeonRng = createRng(seedFromIds(leagueId, String(week), matchupId, "dungeon"));
+        const dungeon = contentSource.generateDungeon(week, 0, dungeonRng, theme, leagueSettings.encounterCount ?? "5-8");
         await prisma.matchup.create({
-          data: { leagueId, week: leagueSettings.seasonWeeks + 2, homeTeamId: semiLoserIds[0], awayTeamId: semiLoserIds[1] },
+          data: { id: matchupId, leagueId, week, homeTeamId: semiLoserIds[0], awayTeamId: semiLoserIds[1], dungeonData: dungeon as any },
         });
       }
 
@@ -345,8 +380,14 @@ export async function advanceWeek(leagueId: string) {
       const finalsTeamIds = new Set([...winnerIds, ...semiLoserIds]);
       const bottomTeams = allTeams.filter((t) => !finalsTeamIds.has(t.id));
       if (bottomTeams.length === 2) {
+        const matchupId = crypto.randomUUID();
+        const week = leagueSettings.seasonWeeks + 2;
+        const themeRng = createRng(seedFromIds(leagueId, String(week), matchupId, "theme"));
+        const theme = themeRng.pick(ALL_THEMES);
+        const dungeonRng = createRng(seedFromIds(leagueId, String(week), matchupId, "dungeon"));
+        const dungeon = contentSource.generateDungeon(week, 0, dungeonRng, theme, leagueSettings.encounterCount ?? "5-8");
         await prisma.matchup.create({
-          data: { leagueId, week: leagueSettings.seasonWeeks + 2, homeTeamId: bottomTeams[0].id, awayTeamId: bottomTeams[1].id },
+          data: { id: matchupId, leagueId, week, homeTeamId: bottomTeams[0].id, awayTeamId: bottomTeams[1].id, dungeonData: dungeon as any },
         });
       }
     }
