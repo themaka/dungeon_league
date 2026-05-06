@@ -94,7 +94,6 @@ After the 23 plan tasks landed, the final whole-branch review surfaced three Cri
 From the final review, deferred to follow-up sessions:
 
 - **I1: Sorcerer specialty differentiation** — `Draconic` and `Wild Magic` have identical `coreEvents` `["hit","arcane_surge"]`. Need distinct mechanics for Wild Magic's "high variance" theme (e.g., random bonus/penalty events).
-- **I3: Hardcoded draft slot count** — `services/draft-service.server.ts:93` has `totalRosterSlots = 36`. Should be `settings.teamCount * settings.rosterSize`.
 - **I4: `playoffTeams` setting unused** — Declared in LeagueSettings, never consulted; bracket size always 4. Either drive the bracket from this setting or remove it.
 - **Consolation matchups removed** — 5v6 (semis week), 3rd-place playoff, and 5v6-rematch (finals week) were stripped to fix the finals-scheduling bug. To bring them back, add a `bracketRound: "regular" | "semifinal" | "consolation_5_6" | "final" | "consolation_3_4"` column on the Matchup model and filter the finals query by `bracketRound === "semifinal"`. While they're missing, 5th and 6th place teams sit idle during playoff weeks.
 - **`playoffWeeks` setting is informational only** — `totalWeeks` is hardcoded to `seasonWeeks + 2` (matching the 2-round bracket). Restoring the setting requires implementing additional bracket rounds (e.g., quarterfinals for 8-team leagues, or "best of N" formats).

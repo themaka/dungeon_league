@@ -83,6 +83,8 @@ export async function makePick(leagueId: string, teamId: string, characterDbId: 
   if (character.teamId) throw new Error("Character already drafted");
   if (character.leagueId !== leagueId) throw new Error("Character not in this league");
 
+  const league = await prisma.league.findUniqueOrThrow({ where: { id: leagueId } });
+  const settings = league.settings as any;
   const drafted = await prisma.character.count({ where: { leagueId, teamId: { not: null } } });
 
   await prisma.character.update({
@@ -90,7 +92,7 @@ export async function makePick(leagueId: string, teamId: string, characterDbId: 
     data: { teamId, draftOrder: drafted },
   });
 
-  const totalRosterSlots = 36;
+  const totalRosterSlots = settings.teamCount * settings.rosterSize;
   if (drafted + 1 >= totalRosterSlots) {
     await prisma.league.update({
       where: { id: leagueId },
