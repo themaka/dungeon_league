@@ -6,7 +6,7 @@ import { runDungeon } from "domain/sim/sim-engine";
 import { score } from "domain/scoring";
 import { generateHighlights } from "domain/highlights";
 import { AIManager, AI_PERSONALITIES } from "domain/ai-manager";
-import { generateRegularSeason } from "domain/schedule";
+import { generateRegularSeason, type ScheduleMatchup } from "domain/schedule";
 import { type Character, type Lineup, type Dungeon } from "domain/types";
 import { applyPreset } from "domain/presets";
 import { runScouting } from "domain/scouting";
@@ -90,10 +90,27 @@ export async function createLeague(
     teamIds.push(aiTeam.id);
   }
 
-  const schedule = generateRegularSeason(teamIds);
-  for (let weekIdx = 0; weekIdx < Math.min(schedule.length, settings.seasonWeeks); weekIdx++) {
-    for (let mIdx = 0; mIdx < schedule[weekIdx].length; mIdx++) {
-      const matchup = schedule[weekIdx][mIdx];
+  const baseSchedule = generateRegularSeason(teamIds);
+  // Loop the round-robin to fill seasonWeeks. For 6 teams the base schedule is
+  // 5 rounds, so a 10-week season cycles twice (with home/away flipped on the
+  // second cycle for variety).
+  const fullSchedule: ScheduleMatchup[][] = [];
+  let cycleIdx = 0;
+  while (fullSchedule.length < settings.seasonWeeks) {
+    for (const round of baseSchedule) {
+      if (fullSchedule.length >= settings.seasonWeeks) break;
+      if (cycleIdx % 2 === 0) {
+        fullSchedule.push(round);
+      } else {
+        fullSchedule.push(round.map((m) => ({ home: m.away, away: m.home })));
+      }
+    }
+    cycleIdx++;
+  }
+
+  for (let weekIdx = 0; weekIdx < fullSchedule.length; weekIdx++) {
+    for (let mIdx = 0; mIdx < fullSchedule[weekIdx].length; mIdx++) {
+      const matchup = fullSchedule[weekIdx][mIdx];
       const week = weekIdx + 1;
       const matchupId = crypto.randomUUID();
       const themeRng = createRng(seedFromIds(league.id, String(week), matchupId, "theme"));
@@ -292,7 +309,9 @@ export async function advanceWeek(leagueId: string) {
   }
 
   const nextWeek = week + 1;
-  const totalWeeks = leagueSettings.seasonWeeks + leagueSettings.playoffWeeks;
+  // Bracket is fixed at 2 rounds (semis + finals). The playoffWeeks setting is
+  // retained for future bracket expansion but currently does not change layout.
+  const totalWeeks = leagueSettings.seasonWeeks + 2;
   const enteringPlayoffs = week === leagueSettings.seasonWeeks;
   const newPhase = nextWeek > totalWeeks ? "complete" : nextWeek > leagueSettings.seasonWeeks ? "playoffs" : "regular";
 
@@ -332,7 +351,7 @@ export async function advanceWeek(leagueId: string) {
     }
   }
 
-  if (week === leagueSettings.seasonWeeks + 1 && newPhase === "playoffs") {
+  if (week === leagueSettings.seasonWeeks + 1) {
     const semiMatchups = await prisma.matchup.findMany({
       where: { leagueId, week },
     });
