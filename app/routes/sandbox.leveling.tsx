@@ -23,6 +23,7 @@ interface SimParams {
   utilityBonus: number;
   milestoneXpPerMatchup: number;
   scaleFactor: number;
+  includeBench: boolean;
 }
 
 const DEFAULTS: SimParams = {
@@ -35,6 +36,7 @@ const DEFAULTS: SimParams = {
   utilityBonus: 1.5,
   milestoneXpPerMatchup: 8,
   scaleFactor: 1.0,
+  includeBench: false,
 };
 
 function parseParams(p: URLSearchParams): SimParams {
@@ -57,6 +59,7 @@ function parseParams(p: URLSearchParams): SimParams {
     utilityBonus: num("utilityBonus", DEFAULTS.utilityBonus),
     milestoneXpPerMatchup: num("milestoneXpPerMatchup", DEFAULTS.milestoneXpPerMatchup),
     scaleFactor: num("scaleFactor", DEFAULTS.scaleFactor),
+    includeBench: p.get("includeBench") === "1",
   };
 }
 
@@ -264,7 +267,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     const lines: string[] = [
       "team,name,class,specialty,role,level,totalXp,totalPoints,avg,games",
     ];
-    for (const r of result.roster) {
+    const csvRoster = params.includeBench
+      ? result.roster
+      : result.roster.filter((r) => r.matchupsPlayed > 0);
+    for (const r of csvRoster) {
       const avg = r.matchupsPlayed > 0 ? (r.totalPoints / r.matchupsPlayed).toFixed(2) : "";
       const fields = [
         `T${r.teamIdx + 1}`,
@@ -306,7 +312,11 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
   const [sortKey, setSortKey] = useState<SortKey>("totalXp");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const sorted = [...result.roster].sort((a, b) => {
+  const filtered = params.includeBench
+    ? result.roster
+    : result.roster.filter((r) => r.matchupsPlayed > 0);
+
+  const sorted = [...filtered].sort((a, b) => {
     const cmp = (() => {
       switch (sortKey) {
         case "totalXp": return a.totalXp - b.totalXp;
@@ -386,6 +396,10 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
             <div style={{ fontSize: "0.8rem" }}>scaleFactor (XP threshold)</div>
             <input name="scaleFactor" type="number" step="0.1" defaultValue={params.scaleFactor} style={{ width: "100%" }} />
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <input name="includeBench" type="checkbox" value="1" defaultChecked={params.includeBench} />
+            <span style={{ fontSize: "0.85rem" }}>Include bench (0-game chars)</span>
+          </label>
         </div>
         <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button type="submit" className="btn btn-gold">Run simulation</button>
@@ -401,6 +415,7 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
               utilityBonus: String(params.utilityBonus),
               milestoneXpPerMatchup: String(params.milestoneXpPerMatchup),
               scaleFactor: String(params.scaleFactor),
+              includeBench: params.includeBench ? "1" : "",
               format: "csv",
             }).toString()}`}
             className="btn"
