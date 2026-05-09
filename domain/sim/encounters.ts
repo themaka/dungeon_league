@@ -15,6 +15,11 @@ interface EncounterCtx {
   rng: Rng;
   hp: Map<string, number>;
   buffs: BuffPools;
+  // Sandbox toggle: heal every wounded ally with per-target probability instead
+  // of healing exactly one. Default behavior (single heal per encounter) is
+  // preserved when undefined or false.
+  healerMultiHeal?: boolean;
+  healerMultiHealChance?: number;
 }
 
 type RollKind = "save" | "trap_save" | "skill";
@@ -231,7 +236,18 @@ export function resolveCombat(
       const maxHp = 10 + c.stats.con;
       return currentHp > 0 && currentHp < maxHp;
     });
-    if (woundedChars.length > 0) {
+    if (ctx.healerMultiHeal) {
+      const chance = ctx.healerMultiHealChance ?? 0.6;
+      for (const target of woundedChars) {
+        if (rng.next() >= chance) continue;
+        const healAmount = Math.max(rng.nextInt(2, 8) + statMod(healer.stats.wis), 1);
+        events.push({
+          kind: "heal", encounterId: encounter.id, actorId: healer.id,
+          targetId: target.id, amount: healAmount,
+        });
+        hp.set(target.id, (hp.get(target.id) ?? 0) + healAmount);
+      }
+    } else if (woundedChars.length > 0) {
       const target = rng.pick(woundedChars);
       const healAmount = Math.max(rng.nextInt(2, 8) + statMod(healer.stats.wis), 1);
       events.push({

@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import { Form } from "react-router";
 import { ProceduralSource } from "domain/content/procedural-source";
 import { runDungeon } from "domain/sim/sim-engine";
-import { pointsForEvent, score } from "domain/scoring";
+import { pointsForEvent, score, type ScoreOptions } from "domain/scoring";
 import { createRng, seedFromIds } from "domain/rng";
 import { applyPreset } from "domain/presets";
 import { ALL_THEMES } from "domain/themes";
@@ -24,6 +24,9 @@ interface SimParams {
   milestoneXpPerMatchup: number;
   scaleFactor: number;
   includeBench: boolean;
+  healerMultiHeal: boolean;
+  healerMultiHealChance: number;
+  healerHitSecondary: boolean;
 }
 
 const DEFAULTS: SimParams = {
@@ -37,6 +40,9 @@ const DEFAULTS: SimParams = {
   milestoneXpPerMatchup: 8,
   scaleFactor: 1.0,
   includeBench: false,
+  healerMultiHeal: false,
+  healerMultiHealChance: 0.6,
+  healerHitSecondary: false,
 };
 
 function parseParams(p: URLSearchParams): SimParams {
@@ -60,6 +66,9 @@ function parseParams(p: URLSearchParams): SimParams {
     milestoneXpPerMatchup: num("milestoneXpPerMatchup", DEFAULTS.milestoneXpPerMatchup),
     scaleFactor: num("scaleFactor", DEFAULTS.scaleFactor),
     includeBench: p.get("includeBench") === "1",
+    healerMultiHeal: p.get("healerMultiHeal") === "1",
+    healerMultiHealChance: num("healerMultiHealChance", DEFAULTS.healerMultiHealChance),
+    healerHitSecondary: p.get("healerHitSecondary") === "1",
   };
 }
 
@@ -216,6 +225,10 @@ function runSim(params: SimParams): SimResult {
     }
   }
 
+  const scoreOpts: ScoreOptions = params.healerHitSecondary
+    ? { extraSecondaryByRole: { Healer: new Set(["hit"]) } }
+    : {};
+
   let totalMatchups = 0;
   for (let season = 0; season < params.numSeasons; season++) {
     const seasonRng = baseRng.fork(`season-${season}`);
@@ -231,8 +244,12 @@ function runSim(params: SimParams): SimResult {
         const lineup: Lineup = { active, bench: [team[4].id, team[5].id] };
         const events = runDungeon(
           lineup, charMap, dungeon, seasonRng.fork(`s-${week}-${team[0].id}`),
+          {
+            healerMultiHeal: params.healerMultiHeal,
+            healerMultiHealChance: params.healerMultiHealChance,
+          },
         );
-        const sc = score(events, team.slice(0, 4));
+        const sc = score(events, team.slice(0, 4), scoreOpts);
         for (const ch of team.slice(0, 4)) {
           const r = results.get(ch.id)!;
           const cs = sc.perCharacter.get(ch.id);
@@ -244,7 +261,7 @@ function runSim(params: SimParams): SimResult {
             const slot = r.events[e.kind] ?? { count: 0, total: 0, points: 0 };
             slot.count += 1;
             slot.total += e.amount ?? 0;
-            slot.points += pointsForEvent(e, ch);
+            slot.points += pointsForEvent(e, ch, scoreOpts);
             r.events[e.kind] = slot;
             if (e.kind === "kill" && e.meta?.boss) r.bossKills += 1;
           }
@@ -521,6 +538,24 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
             <span style={{ fontSize: "0.85rem" }}>Include bench (0-game chars)</span>
           </label>
         </div>
+
+        <div style={{ marginTop: "0.75rem", paddingTop: "0.5rem", borderTop: "1px dashed var(--ink-light)" }}>
+          <div style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.4rem" }}>Healer experiments</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <input name="healerMultiHeal" type="checkbox" value="1" defaultChecked={params.healerMultiHeal} />
+              <span style={{ fontSize: "0.85rem" }}>Multi-target heal per encounter</span>
+            </label>
+            <label>
+              <div style={{ fontSize: "0.8rem" }}>Per-target heal chance</div>
+              <input name="healerMultiHealChance" type="number" step="0.05" min={0} max={1} defaultValue={params.healerMultiHealChance} style={{ width: "100%" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <input name="healerHitSecondary" type="checkbox" value="1" defaultChecked={params.healerHitSecondary} />
+              <span style={{ fontSize: "0.85rem" }}>Add `hit` to Healer secondary (0.3×)</span>
+            </label>
+          </div>
+        </div>
         <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <button type="submit" className="btn btn-gold">Run simulation</button>
           <a href="/sandbox/leveling" className="btn">Reset</a>
@@ -536,6 +571,9 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
               milestoneXpPerMatchup: String(params.milestoneXpPerMatchup),
               scaleFactor: String(params.scaleFactor),
               includeBench: params.includeBench ? "1" : "",
+              healerMultiHeal: params.healerMultiHeal ? "1" : "",
+              healerMultiHealChance: String(params.healerMultiHealChance),
+              healerHitSecondary: params.healerHitSecondary ? "1" : "",
               format: "csv",
             }).toString()}`}
             className="btn"

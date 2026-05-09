@@ -1,7 +1,14 @@
 import type {
-  Character, CharacterScore, EventKind, Milestone, ScoreResult, SimEvent,
+  Character, CharacterScore, EventKind, Milestone, Role, ScoreResult, SimEvent,
 } from "./types";
 import { isCoreEventForSpecialty } from "./specialties";
+
+export interface ScoreOptions {
+  // Optional extra secondary role events. Merged into ROLE_SECONDARY_EVENTS at
+  // scoring time. Lets the sandbox A/B "what if hit was Healer secondary?"
+  // without forking the engine.
+  extraSecondaryByRole?: Partial<Record<Role, Set<EventKind>>>;
+}
 
 const BASE_POINTS: Record<EventKind, number | ((e: SimEvent) => number)> = {
   hit: (e) => (e.amount ?? 0) * 0.12,
@@ -60,20 +67,21 @@ function basePointsFor(event: SimEvent): number {
   return calc;
 }
 
-export function pointsForEvent(event: SimEvent, character: Character): number {
+export function pointsForEvent(event: SimEvent, character: Character, opts: ScoreOptions = {}): number {
   const base = basePointsFor(event);
   let total = base;
   const core = ROLE_CORE_EVENTS[character.role];
   const secondary = ROLE_SECONDARY_EVENTS[character.role];
+  const extra = opts.extraSecondaryByRole?.[character.role as Role];
   if (core?.has(event.kind)) total += base * ROLE_CORE_MULT;
-  else if (secondary?.has(event.kind)) total += base * ROLE_SECONDARY_MULT;
+  else if (secondary?.has(event.kind) || extra?.has(event.kind)) total += base * ROLE_SECONDARY_MULT;
   if (isCoreEventForSpecialty(character.specialty, event.kind)) {
     total += base * SPECIALTY_BONUS_MULT;
   }
   return total;
 }
 
-export function score(events: SimEvent[], roster: Character[]): ScoreResult {
+export function score(events: SimEvent[], roster: Character[], opts: ScoreOptions = {}): ScoreResult {
   const charMap = new Map(roster.map((c) => [c.id, c]));
   const scores = new Map<string, CharacterScore>();
 
@@ -99,9 +107,10 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
 
     const core = ROLE_CORE_EVENTS[char.role];
     const secondary = ROLE_SECONDARY_EVENTS[char.role];
+    const extra = opts.extraSecondaryByRole?.[char.role as Role];
     if (core?.has(event.kind)) {
       cs.roleMultiplierPoints += base * ROLE_CORE_MULT;
-    } else if (secondary?.has(event.kind)) {
+    } else if (secondary?.has(event.kind) || extra?.has(event.kind)) {
       cs.roleMultiplierPoints += base * ROLE_SECONDARY_MULT;
     }
 

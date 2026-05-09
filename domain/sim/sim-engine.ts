@@ -14,6 +14,10 @@ export interface RunDungeonOptions {
   // Optional override for revivify charges. If omitted, charges are derived from
   // each Life Domain Cleric's level.
   revivifyCharges?: Record<string, number>;
+  // Sandbox toggle: heal every wounded ally with per-target probability instead
+  // of healing exactly one per combat encounter.
+  healerMultiHeal?: boolean;
+  healerMultiHealChance?: number;
 }
 
 export function runDungeon(
@@ -51,7 +55,11 @@ export function runDungeon(
     const alive = activeChars.filter((c) => (hp.get(c.id) ?? 0) > 0);
     if (alive.length === 0) break;
 
-    const ctx: EncounterCtx = { rng, hp, buffs };
+    const ctx: EncounterCtx = {
+      rng, hp, buffs,
+      healerMultiHeal: options.healerMultiHeal,
+      healerMultiHealChance: options.healerMultiHealChance,
+    };
 
     let events: SimEvent[] = [];
     switch (encounter.type) {
