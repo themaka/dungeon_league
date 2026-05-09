@@ -192,18 +192,52 @@ function runSim(params: SimParams): SimResult {
   const settings = applyPreset("standard");
   const source = new ProceduralSource();
   const ROSTER_PER_TEAM = 6;
-  const totalChars = params.numTeams * ROSTER_PER_TEAM;
   const baseRng = createRng(seedFromIds("sandbox", params.charSeed));
-  const characters = source.generateCharacters(totalChars, baseRng, settings);
-  const charMap = new Map(characters.map((c) => [c.id, c]));
 
-  const sorted = [...characters].sort((a, b) => {
-    const sa = Object.values(a.stats).reduce((s: number, v: number) => s + v, 0);
-    const sb = Object.values(b.stats).reduce((s: number, v: number) => s + v, 0);
-    return sb - sa;
-  });
+  // Generate a larger pool than strictly needed to guarantee enough of each
+  // role for balanced active lineups (1 of each role per team's first 4).
+  // Pool size = 6× target so a 50/17/17/17 expected role split still yields
+  // 4× the needed Tanks/Healers/Utilities for 4 teams without retry.
+  const poolSize = Math.max(params.numTeams * ROSTER_PER_TEAM * 6, 144);
+  const characters = source.generateCharacters(poolSize, baseRng, settings);
+
+  const buckets: Record<Role, Character[]> = { Tank: [], Healer: [], DPS: [], Utility: [] };
+  for (const c of characters) buckets[c.role].push(c);
+  for (const role of ["Tank", "Healer", "DPS", "Utility"] as Role[]) {
+    buckets[role].sort((a, b) => {
+      const sa = Object.values(a.stats).reduce((s: number, v: number) => s + v, 0);
+      const sb = Object.values(b.stats).reduce((s: number, v: number) => s + v, 0);
+      return sb - sa;
+    });
+    if (buckets[role].length < params.numTeams) {
+      throw new Error(
+        `Not enough ${role} characters in the pool (have ${buckets[role].length}, need ${params.numTeams}). Try another charSeed or reduce numTeams.`,
+      );
+    }
+  }
+
   const teams: Character[][] = Array.from({ length: params.numTeams }, () => []);
-  sorted.forEach((c, i) => teams[i % params.numTeams].push(c));
+  const used = new Set<string>();
+  for (let t = 0; t < params.numTeams; t++) {
+    const tank = buckets.Tank[t];
+    const healer = buckets.Healer[t];
+    const dps = buckets.DPS[t];
+    const util = buckets.Utility[t];
+    teams[t].push(tank, healer, dps, util);
+    used.add(tank.id); used.add(healer.id); used.add(dps.id); used.add(util.id);
+  }
+
+  // Bench: fill from unused characters, 2 per team (round-robin so bench is
+  // a mix of roles rather than concentrated).
+  const benchPool = characters.filter((c) => !used.has(c.id));
+  for (let t = 0; t < params.numTeams; t++) {
+    teams[t].push(benchPool[t * 2], benchPool[t * 2 + 1]);
+  }
+
+  // charMap only needs the chars that ended up on teams, but keeping all is harmless.
+  const onTeams = new Set<string>();
+  for (const team of teams) for (const c of team) onTeams.add(c.id);
+  const charMap = new Map(characters.filter((c) => onTeams.has(c.id)).map((c) => [c.id, c]));
 
   const results = new Map<string, CharResult>();
   for (let t = 0; t < teams.length; t++) {
@@ -287,7 +321,7 @@ function runSim(params: SimParams): SimResult {
   const active = roster.filter((r) => r.matchupsPlayed > 0);
   const r = pearson(active.map((c) => c.totalPoints), active.map((c) => c.totalXp));
 
-  return { roster, perRoleXp, pearson: r, totalChars, totalMatchups };
+  return { roster, perRoleXp, pearson: r, totalChars: onTeams.size, totalMatchups };
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -484,7 +518,9 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
       <h1>Leveling Sandbox</h1>
       <p style={{ color: "var(--ink-light)", fontSize: "0.9rem" }}>
         Deterministic league simulation. Same charSeed → same characters and matchups across runs;
-        change xpMode / multipliers to see how leveling outcomes shift.
+        change xpMode / multipliers to see how leveling outcomes shift. Active lineups are
+        force-balanced — every team plays 1 Tank / 1 Healer / 1 DPS / 1 Utility, picked by stat
+        total from a generated pool large enough to guarantee enough of each role.
       </p>
 
       <Form method="get" className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
