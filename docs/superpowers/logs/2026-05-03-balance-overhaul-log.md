@@ -127,6 +127,26 @@ Best mode by both correlation and evenness so far: **No-bonus + Utility lift** (
 
 **Open question:** which rule to commit to `domain/leveling.ts`. Decision deferred until the sandbox has produced a configuration the user is happy with.
 
+### Sandbox extensions (post-initial)
+
+The sandbox has grown several additional knobs as playtesting surfaced more questions:
+
+- **Click-to-expand event breakdowns** — Clicking any character's name in the roster table expands a stat block beneath the row, grouped Combat / Defense / Support / Skill. Each row shows count, cumulative amount (with unit: `dmg` or `hp`), and per-event-kind points contribution via `pointsForEvent`. Footer reconciles event points + milestones = total.
+- **Healer experiments (opt-in toggles)** — Playtest revealed Healers periodically bottom out because the sim only emits one heal event per combat encounter and `hit`/`damage_taken` earn no role multiplier for them. Two new sandbox toggles:
+  - `healerMultiHeal` + `healerMultiHealChance` (default off, 0.6) — when on, `resolveCombat` heals every wounded ally with that per-target probability instead of healing exactly one. Plumbed through `RunDungeonOptions` → `EncounterCtx`. Production behavior is preserved when the flag is off.
+  - `healerHitSecondary` (default off) — when on, scoring credits Healers' own attack rolls at the 0.3× secondary multiplier. Implemented via new `ScoreOptions.extraSecondaryByRole` parameter on `score()` and `pointsForEvent()` in `domain/scoring.ts`. Existing callers unchanged.
+- **Force-balanced active lineups** — Role is determined by class via `CLASS_ROLE_MAP`, and class is randomly picked, so a 24-char pool with the 50% DPS / 17% each-other expected split could leave a team with 0 Healers or 0 Utility. Sandbox now generates 6× the strict roster size, buckets characters by role, sorts each bucket by total stats, and seats the top-N of each role into the active 4 of each team (T/H/D/U) with bench drawn from the unused remainder. Every team plays exactly 1 of each role, so per-role mean XP is now apples-to-apples.
+- **Playoff structure** (new default, 8 weeks total) — Sandbox week count is split into three dials: `regularWeeks` (default 5, all teams play), `semiWeeks` (default 2, top 4 teams), `finalWeeks` (default 1, top 2 teams). Teams are ranked by total points so far when picking who advances. Numbers from this structure (5 seasons × 6 teams × 4 active, NoBon+Util):
+
+  | Role | Mean XP | End XP | End level |
+  |---|---:|---:|:---:|
+  | Tank | 90 | 120 | L7 |
+  | Healer | 51 | 81 | L5 |
+  | DPS | 60 | 91 | L5 |
+  | Utility | 56 | 86 | L5 |
+
+  Pearson correlation rises to **r=0.73** (vs 0.40 today, 0.62 at 10 straight weeks) because elimination filters out losing teams whose chars stop scoring AND earning XP simultaneously. Built-in asymmetry: top 2 teams play 8 games, mid 2 play 7, bottom 2 play 5 — a 38% XP deficit for early-eliminated rosters. This is intentional for the playoff feel but worth flagging when comparing leveling outcomes across teams.
+
 ## Manual Verification Checklist
 
 Before merging, recommend:

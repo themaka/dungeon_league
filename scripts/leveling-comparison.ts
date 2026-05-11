@@ -12,7 +12,10 @@ import { isCoreEventForSpecialty } from "../domain/specialties";
 import type { Character, EventKind, Lineup, Role, SimEvent } from "../domain/types";
 
 const NUM_SEASONS = 5;
-const WEEKS_PER_SEASON = 10;
+const REGULAR_WEEKS = 5;
+const SEMI_WEEKS = 2;
+const FINAL_WEEKS = 1;
+const WEEKS_PER_SEASON = REGULAR_WEEKS + SEMI_WEEKS + FINAL_WEEKS;
 const TEAMS = 6;
 const ROSTER = 6;
 
@@ -219,20 +222,31 @@ function main() {
       }
     }
 
-    for (let week = 1; week <= WEEKS_PER_SEASON; week++) {
-      const themeRng = rng.fork(`theme-${week}`);
+    let weekCounter = 0;
+    const teamPoints = (idxs: number[]) =>
+      idxs.map((i) => ({
+        idx: i,
+        pts: teams[i].slice(0, 4).reduce(
+          (s, c) => s + (seasonChars.get(c.id)?.totalPoints ?? 0),
+          0,
+        ),
+      }));
+    const playWeek = (teamIdxs: number[], phase: string) => {
+      weekCounter += 1;
+      const themeRng = rng.fork(`theme-${phase}-${weekCounter}`);
       const theme = themeRng.pick(ALL_THEMES);
       const dungeon = source.generateDungeon(
-        week, 0, rng.fork(`d-${week}`), theme, settings.encounterCount,
+        weekCounter, 0, rng.fork(`d-${phase}-${weekCounter}`), theme, settings.encounterCount,
       );
-
-      for (const team of teams) {
+      for (const idx of teamIdxs) {
+        const team = teams[idx];
         if (team.length < ROSTER) continue;
         const active = team.slice(0, 4).map((c) => c.id) as [string, string, string, string];
         const lineup: Lineup = { active, bench: [team[4].id, team[5].id] };
-        const events = runDungeon(lineup, charMap, dungeon, rng.fork(`s-${week}-${team[0].id}`));
+        const events = runDungeon(
+          lineup, charMap, dungeon, rng.fork(`s-${phase}-${weekCounter}-${team[0].id}`),
+        );
         const result = score(events, team.slice(0, 4));
-
         for (const ch of team.slice(0, 4)) {
           const cs = result.perCharacter.get(ch.id);
           const r = seasonChars.get(ch.id)!;
@@ -242,10 +256,18 @@ function main() {
           r.xpBroadened += xpBroadened(ch, events);
           r.xpBroadenedNoBonus += xpBroadenedNoBonus(ch, events);
           r.xpBroadenedNoBonusUtil += xpBroadenedNoBonusUtilLift(ch, events);
-          // Milestone XP: defer calibration to after we know the current avg.
         }
       }
-    }
+    };
+
+    const allTeamIdxs = teams.map((_, i) => i);
+    for (let i = 0; i < REGULAR_WEEKS; i++) playWeek(allTeamIdxs, "reg");
+
+    const semiIdxs = teamPoints(allTeamIdxs).sort((a, b) => b.pts - a.pts).slice(0, 4).map((x) => x.idx);
+    for (let i = 0; i < SEMI_WEEKS; i++) playWeek(semiIdxs, "semi");
+
+    const finalIdxs = teamPoints(semiIdxs).sort((a, b) => b.pts - a.pts).slice(0, 2).map((x) => x.idx);
+    for (let i = 0; i < FINAL_WEEKS; i++) playWeek(finalIdxs, "final");
 
     for (const r of seasonChars.values()) {
       if (r.matchupsPlayed > 0) allResults.push(r);

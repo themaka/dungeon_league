@@ -17,7 +17,9 @@ interface SimParams {
   charSeed: string;
   numTeams: number;
   numSeasons: number;
-  weeksPerSeason: number;
+  regularWeeks: number;
+  semiWeeks: number;
+  finalWeeks: number;
   xpMode: XpMode;
   specialtyBonus: number;
   utilityBonus: number;
@@ -33,7 +35,9 @@ const DEFAULTS: SimParams = {
   charSeed: "alpha",
   numTeams: 4,
   numSeasons: 10,
-  weeksPerSeason: 10,
+  regularWeeks: 5,
+  semiWeeks: 2,
+  finalWeeks: 1,
   xpMode: "nobonus_util",
   specialtyBonus: 1.5,
   utilityBonus: 1.5,
@@ -59,7 +63,9 @@ function parseParams(p: URLSearchParams): SimParams {
     charSeed: p.get("charSeed") || DEFAULTS.charSeed,
     numTeams: Math.max(2, Math.min(8, Math.round(num("numTeams", DEFAULTS.numTeams)))),
     numSeasons: Math.max(1, Math.min(50, Math.round(num("numSeasons", DEFAULTS.numSeasons)))),
-    weeksPerSeason: Math.max(1, Math.min(30, Math.round(num("weeksPerSeason", DEFAULTS.weeksPerSeason)))),
+    regularWeeks: Math.max(1, Math.min(30, Math.round(num("regularWeeks", DEFAULTS.regularWeeks)))),
+    semiWeeks: Math.max(0, Math.min(10, Math.round(num("semiWeeks", DEFAULTS.semiWeeks)))),
+    finalWeeks: Math.max(0, Math.min(10, Math.round(num("finalWeeks", DEFAULTS.finalWeeks)))),
     xpMode,
     specialtyBonus: num("specialtyBonus", DEFAULTS.specialtyBonus),
     utilityBonus: num("utilityBonus", DEFAULTS.utilityBonus),
@@ -263,21 +269,31 @@ function runSim(params: SimParams): SimResult {
     ? { extraSecondaryByRole: { Healer: new Set(["hit"]) } }
     : {};
 
+  const teamPoints = (teamIdx: number) =>
+    teams[teamIdx].slice(0, 4).reduce((s, c) => s + (results.get(c.id)?.totalPoints ?? 0), 0);
+
+  const rankedTopN = (pool: number[], n: number) =>
+    [...pool].sort((a, b) => teamPoints(b) - teamPoints(a)).slice(0, Math.min(n, pool.length));
+
   let totalMatchups = 0;
   for (let season = 0; season < params.numSeasons; season++) {
     const seasonRng = baseRng.fork(`season-${season}`);
-    for (let week = 1; week <= params.weeksPerSeason; week++) {
-      const themeRng = seasonRng.fork(`theme-${week}`);
+    let week = 0;
+
+    const playWeek = (teamIndexes: number[], phase: string) => {
+      week += 1;
+      const themeRng = seasonRng.fork(`theme-${phase}-${week}`);
       const theme = themeRng.pick(ALL_THEMES);
       const dungeon = source.generateDungeon(
-        week, 0, seasonRng.fork(`d-${week}`), theme, settings.encounterCount,
+        week, 0, seasonRng.fork(`d-${phase}-${week}`), theme, settings.encounterCount,
       );
-      for (const team of teams) {
+      for (const ti of teamIndexes) {
+        const team = teams[ti];
         if (team.length < 6) continue;
         const active = team.slice(0, 4).map((c) => c.id) as [string, string, string, string];
         const lineup: Lineup = { active, bench: [team[4].id, team[5].id] };
         const events = runDungeon(
-          lineup, charMap, dungeon, seasonRng.fork(`s-${week}-${team[0].id}`),
+          lineup, charMap, dungeon, seasonRng.fork(`s-${phase}-${week}-${team[0].id}`),
           {
             healerMultiHeal: params.healerMultiHeal,
             healerMultiHealChance: params.healerMultiHealChance,
@@ -302,7 +318,16 @@ function runSim(params: SimParams): SimResult {
         }
         totalMatchups += 1;
       }
-    }
+    };
+
+    const allTeams = teams.map((_, i) => i);
+    for (let i = 0; i < params.regularWeeks; i++) playWeek(allTeams, "reg");
+
+    const semiTeams = rankedTopN(allTeams, 4);
+    for (let i = 0; i < params.semiWeeks; i++) playWeek(semiTeams, "semi");
+
+    const finalTeams = rankedTopN(semiTeams, 2);
+    for (let i = 0; i < params.finalWeeks; i++) playWeek(finalTeams, "final");
   }
 
   const roster: CharResult[] = [];
@@ -538,8 +563,16 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
             <input name="numSeasons" type="number" min={1} max={50} defaultValue={params.numSeasons} style={{ width: "100%" }} />
           </label>
           <label>
-            <div style={{ fontSize: "0.8rem" }}>Weeks/season</div>
-            <input name="weeksPerSeason" type="number" min={1} max={30} defaultValue={params.weeksPerSeason} style={{ width: "100%" }} />
+            <div style={{ fontSize: "0.8rem" }}>Regular weeks (all teams)</div>
+            <input name="regularWeeks" type="number" min={1} max={30} defaultValue={params.regularWeeks} style={{ width: "100%" }} />
+          </label>
+          <label>
+            <div style={{ fontSize: "0.8rem" }}>Semi weeks (top 4)</div>
+            <input name="semiWeeks" type="number" min={0} max={10} defaultValue={params.semiWeeks} style={{ width: "100%" }} />
+          </label>
+          <label>
+            <div style={{ fontSize: "0.8rem" }}>Final weeks (top 2)</div>
+            <input name="finalWeeks" type="number" min={0} max={10} defaultValue={params.finalWeeks} style={{ width: "100%" }} />
           </label>
 
           <label>
@@ -600,7 +633,9 @@ export default function Sandbox({ loaderData }: Route.ComponentProps) {
               charSeed: params.charSeed,
               numTeams: String(params.numTeams),
               numSeasons: String(params.numSeasons),
-              weeksPerSeason: String(params.weeksPerSeason),
+              regularWeeks: String(params.regularWeeks),
+              semiWeeks: String(params.semiWeeks),
+              finalWeeks: String(params.finalWeeks),
               xpMode: params.xpMode,
               specialtyBonus: String(params.specialtyBonus),
               utilityBonus: String(params.utilityBonus),
