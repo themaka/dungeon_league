@@ -10,7 +10,7 @@ import { generateRegularSeason, type ScheduleMatchup } from "domain/schedule";
 import { type Character, type Lineup, type Dungeon } from "domain/types";
 import { applyPreset } from "domain/presets";
 import { runScouting } from "domain/scouting";
-import { applyXpAndLevel, xpFromEvents } from "domain/leveling";
+import { applyXpAndLevel, xpFromEvents, xpScaleFor } from "domain/leveling";
 import type { LeagueSettings, PresetName } from "domain/types";
 import { ALL_THEMES } from "domain/themes";
 
@@ -226,7 +226,7 @@ export async function advanceWeek(leagueId: string) {
     const awayResult = await processTeam(matchup.awayTeam);
 
     if (leagueSettings.xpEnabled !== false) {
-      const xpScale = 10 / Math.max(1, leagueSettings.seasonWeeks ?? 10);
+      const xpScale = xpScaleFor(leagueSettings);
       for (const teamSide of ["home", "away"] as const) {
         const result = teamSide === "home" ? homeResult : awayResult;
         const teamId = teamSide === "home" ? matchup.homeTeamId : matchup.awayTeamId;
