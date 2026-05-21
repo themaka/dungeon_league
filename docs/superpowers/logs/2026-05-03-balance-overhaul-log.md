@@ -204,3 +204,19 @@ After the initial 35-commit branch was declared merge-ready, manual testing surf
 - **Determinism preserved end-to-end.** Same `leagueId` reproduces same scouting reports, same matchups, same XP outcomes. All RNG forks derive from `seedFromIds(...)`.
 - **Pure domain core.** No service file imports leak into `domain/`. The sim still runs as `(lineup, charMap, dungeon, rng) => events`; persistence is purely service-layer concern.
 - **Cross-module data integrity.** `procedural-source.ts` imports `STAT_BUMP_LEVELS` and `SCALING_LEVELS` from `leveling.ts` instead of duplicating them; `specialties.ts` self-checks at module load that data tables agree.
+
+## Leveling Rule + I5 Resolved (2026-05-21)
+
+The leveling/scoring-coupling investigation and I5 (`targetLevel` setting unused) are now resolved on `balance-overhaul`. See `docs/superpowers/specs/2026-05-21-leveling-rule-and-xp-scale-design.md` for the design, rationale, and harness data.
+
+**Shipped:**
+
+- **Floor×3.0 leveling rule** in `domain/leveling.ts` — broadened eligibility (specialty-core OR role-core counts), no compound bonus when both match, 3.0× lift on every Utility role event for Utility characters (the floor fix that reaches Thief specialty events).
+- **3.5× XP_AWARD_MULTIPLIER** pace calibration — final season point↔XP Pearson r=0.71 (vs 0.40 under the old rule), Utility role mean XP 63 (vs 18), all four primary presets approximate their declared `targetLevel` by season end.
+- **`xpScaleFor` formula** in `domain/leveling.ts`, wired into `services/league-service.server.ts`. Standard 1.0, Quick 1.13, Veterans 0.76, Epic 0.63, Champions 1.0 (guard).
+
+**Not migrated:** in-flight league XP is preserved as-credited; the new rule applies from the next `advanceWeek` onward.
+
+**Sandbox + harness:** kept as audit trail (`scripts/leveling-comparison.ts`, `app/routes/sandbox.leveling.tsx`). Their experimental knobs (healer toggles, force-balanced lineups, sandbox playoff structure) remain sandbox-only — separate decisions for separate sessions.
+
+**Tank/Healer XP gap still open:** Tank mean 90, Healer 51 (~43% gap) — surfaced by the harness, deferred to a future tuning round.
