@@ -1,4 +1,4 @@
-import type { Character, EventKind, Role, SimEvent } from "./types";
+import type { Character, EventKind, LeagueSettings, Role, SimEvent } from "./types";
 import { unlockTierForLevel } from "./abilities";
 import { isCoreEventForSpecialty, primaryStatForSpecialty } from "./specialties";
 
@@ -158,4 +158,18 @@ export function applyXpAndLevel(
   }
 
   return { character: next, levelUps };
+}
+
+export function xpScaleFor(
+  settings: Pick<LeagueSettings, "startingLevel" | "targetLevel" | "seasonWeeks">,
+): number {
+  const baselineRange = XP_THRESHOLDS[13] - XP_THRESHOLDS[3];   // 350
+  const baselineWeeks = 10;
+  const startXp = XP_THRESHOLDS[settings.startingLevel];
+  const targetXp = XP_THRESHOLDS[settings.targetLevel];
+  if (startXp === undefined || targetXp === undefined) return 1.0;
+  const presetRange = targetXp - startXp;
+  if (presetRange <= 0) return 1.0;
+  if (settings.seasonWeeks <= 0) return 1.0;
+  return (baselineRange * settings.seasonWeeks) / (presetRange * baselineWeeks);
 }

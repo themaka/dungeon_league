@@ -5,6 +5,7 @@ import {
   applyXpAndLevel,
   scaledThresholds,
   xpMultiplierFor,
+  xpScaleFor,
 } from "domain/leveling";
 import type { Character, SimEvent } from "domain/types";
 
@@ -223,6 +224,56 @@ describe("leveling", () => {
         class: "Rogue", role: "Utility", specialty: "Thief",
       });
       expect(xpMultiplierFor(utilityChar, false, true)).toBe(1.0);
+    });
+  });
+
+  describe("xpScaleFor", () => {
+    it("returns 1.0 for Standard preset shape (L3 → L13, 10 weeks)", () => {
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: 10 }))
+        .toBeCloseTo(1.0, 3);
+    });
+
+    it("returns ~1.129 for Quick preset shape (L3 → L9, 5 weeks)", () => {
+      // (350 * 5) / (155 * 10) = 1.129
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 9, seasonWeeks: 5 }))
+        .toBeCloseTo(1.129, 3);
+    });
+
+    it("returns ~0.764 for Veterans preset shape (L5 → L16, 12 weeks)", () => {
+      // (350 * 12) / (550 * 10) = 0.7636
+      expect(xpScaleFor({ startingLevel: 5, targetLevel: 16, seasonWeeks: 12 }))
+        .toBeCloseTo(0.764, 3);
+    });
+
+    it("returns ~0.631 for Epic preset shape (L3 → L20, 20 weeks)", () => {
+      // (350 * 20) / (1110 * 10) = 0.6306
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 20, seasonWeeks: 20 }))
+        .toBeCloseTo(0.631, 3);
+    });
+
+    it("returns 1.0 guard when targetLevel === startingLevel (Champions)", () => {
+      expect(xpScaleFor({ startingLevel: 20, targetLevel: 20, seasonWeeks: 10 }))
+        .toBe(1.0);
+    });
+
+    it("returns 1.0 guard when targetLevel is out of range", () => {
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 99, seasonWeeks: 10 }))
+        .toBe(1.0);
+    });
+
+    it("returns 1.0 guard when startingLevel is out of range", () => {
+      expect(xpScaleFor({ startingLevel: 0, targetLevel: 13, seasonWeeks: 10 }))
+        .toBe(1.0);
+    });
+
+    it("returns 1.0 guard when seasonWeeks is 0 or negative", () => {
+      // Defensive guard — preserves the Math.max(1, ...) protection that the
+      // service-layer caller used to perform inline. Custom presets or test
+      // fixtures could accidentally hit this.
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: 0 }))
+        .toBe(1.0);
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: -5 }))
+        .toBe(1.0);
     });
   });
 });
