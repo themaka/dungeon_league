@@ -39,15 +39,21 @@ describe("leveling", () => {
     expect(xpFromEvents(c, events)).toBeGreaterThan(0);
   });
 
-  it("applies 1.5x specialty bonus on aligned events", () => {
+  it("applies 1.5x specialty bonus on aligned events (non-Utility)", () => {
+    // Life Domain Healer: heal IS in Healer role set AND IS specialty-core → 1.5x
+    // War Domain Healer:  heal IS in Healer role set, NOT specialty-core → 1.0x
+    // base XP for heal amount=10: max(1, floor(10/4)) = 2
+    // aligned per-event = round(2 * 1.5) = 3 ; total before calibration = 3
+    //                   → final = round(3 * 3.5) = 11
+    // offspec per-event = round(2 * 1.0) = 2 ; total before calibration = 2
+    //                   → final = round(2 * 3.5) = 7
     const aligned = mkChar({ specialty: "Life Domain" });
     const offspec = mkChar({ specialty: "War Domain" });
     const events: SimEvent[] = [
       { kind: "heal", encounterId: "e", actorId: "c1", amount: 10 },
     ];
-    const xpAligned = xpFromEvents(aligned, events);
-    const xpOffspec = xpFromEvents(offspec, events);
-    expect(xpAligned).toBeCloseTo(xpOffspec * 1.5, 4);
+    expect(xpFromEvents(aligned, events)).toBe(11);
+    expect(xpFromEvents(offspec, events)).toBe(7);
   });
 
   it("DPS earns no XP from heal events", () => {
@@ -119,6 +125,65 @@ describe("leveling", () => {
     ];
     const xp = xpFromEvents(c, events);
     expect(Number.isInteger(xp)).toBe(true);
+  });
+
+  describe("Floor×3.0 + 3.5x calibration", () => {
+    it("applies UTILITY_XP_LIFT (3.0) plus 3.5x calibration on a Bard Lore persuade", () => {
+      // Bard Lore is Utility role; persuade is in Utility role set AND IS Lore specialty-core.
+      // base XP for persuade: 2
+      // per-event mult: 3.0 (UTILITY_XP_LIFT — Utility chars always get ≥ 3.0× on Utility role events)
+      // per-event = round(2 * 3.0) = 6 ; total = 6 ; final = round(6 * 3.5) = 21
+      const bardLore = mkChar({
+        class: "Bard", role: "Utility", specialty: "Lore",
+      });
+      const events: SimEvent[] = [
+        { kind: "persuade", encounterId: "e", actorId: "c1" },
+      ];
+      expect(xpFromEvents(bardLore, events)).toBe(21);
+    });
+
+    it("applies UTILITY_XP_LIFT to Rogue Thief on disarm_trap (the floor-fix case)", () => {
+      // Thief specialty events (disarm_trap, find_treasure) ARE Utility-role events.
+      // Under the old NoBon+UtilLift rule, the `else if` bypassed them — Thief stayed at L2.
+      // Floor fix: Utility role events for Utility chars always get 3.0x.
+      // base XP for disarm_trap: 2
+      // per-event = round(2 * 3.0) = 6 ; total = 6 ; final = round(6 * 3.5) = 21
+      const thief = mkChar({
+        class: "Rogue", role: "Utility", specialty: "Thief",
+      });
+      const events: SimEvent[] = [
+        { kind: "disarm_trap", encounterId: "e", actorId: "c1" },
+      ];
+      expect(xpFromEvents(thief, events)).toBe(21);
+    });
+
+    it("applies 3.5x calibration to a Fighter Champion crit (non-Utility specialty bonus preserved)", () => {
+      // crit IS in DPS role set AND IS Champion specialty-core → mult 1.5
+      // base XP for crit: 2
+      // per-event = round(2 * 1.5) = 3 ; total = 3 ; final = round(3 * 3.5) = 11
+      const champion = mkChar({
+        class: "Fighter", role: "DPS", specialty: "Champion",
+      });
+      const events: SimEvent[] = [
+        { kind: "crit", encounterId: "e", actorId: "c1" },
+      ];
+      expect(xpFromEvents(champion, events)).toBe(11);
+    });
+
+    it("broadened eligibility: counts specialty-core events outside the role set (no role bonus)", () => {
+      // Vengeance Paladin (Tank role); smite IS specialty-core but NOT in Tank role set.
+      // Without broadened eligibility, this event would be skipped.
+      // With broadened: counted at mult 1.0 (specialty-only, no compound).
+      // base XP for smite amount=8: max(1, floor(8/4)) = 2
+      // per-event = round(2 * 1.0) = 2 ; total = 2 ; final = round(2 * 3.5) = 7
+      const veng = mkChar({
+        class: "Paladin", role: "Tank", specialty: "Vengeance",
+      });
+      const events: SimEvent[] = [
+        { kind: "smite", encounterId: "e", actorId: "c1", amount: 8 },
+      ];
+      expect(xpFromEvents(veng, events)).toBe(7);
+    });
   });
 
   describe("xpMultiplierFor", () => {

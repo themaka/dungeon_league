@@ -80,14 +80,16 @@ export function xpFromEvents(character: Character, events: SimEvent[]): number {
   const roleSet = ROLE_XP_EVENTS[character.role];
   for (const event of events) {
     if (event.actorId !== character.id) continue;
-    if (!roleSet.has(event.kind)) continue;
-    let amount = xpAmountForEvent(event);
-    if (isCoreEventForSpecialty(character.specialty, event.kind)) {
-      amount = Math.round(amount * SPECIALTY_XP_BONUS);
-    }
-    total += amount;
+    const isRoleEvent = roleSet.has(event.kind);
+    const isSpecialtyCore = isCoreEventForSpecialty(character.specialty, event.kind);
+    if (!isRoleEvent && !isSpecialtyCore) continue;
+    const base = xpAmountForEvent(event);
+    const mult = xpMultiplierFor(character, isRoleEvent, isSpecialtyCore);
+    // Round per-event then aggregate so each event credits an integer; final
+    // multiplier rounded once at the end. Order matters for calibration.
+    total += Math.round(base * mult);
   }
-  return total;
+  return Math.round(total * XP_AWARD_MULTIPLIER);
 }
 
 export function scaledThresholds(scaleFactor: number): Record<number, number> {
