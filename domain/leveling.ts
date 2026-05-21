@@ -33,6 +33,18 @@ export const ROLE_XP_EVENTS: Record<Role, Set<EventKind>> = {
 };
 
 const SPECIALTY_XP_BONUS = 1.5;
+const UTILITY_XP_LIFT = 3.0;
+const XP_AWARD_MULTIPLIER = 3.5;
+
+export function xpMultiplierFor(
+  character: Character,
+  isRoleEvent: boolean,
+  isSpecialtyCore: boolean,
+): number {
+  if (character.role === "Utility" && isRoleEvent) return UTILITY_XP_LIFT;
+  if (isRoleEvent && isSpecialtyCore) return SPECIALTY_XP_BONUS;
+  return 1.0;
+}
 
 function xpAmountForEvent(event: SimEvent): number {
   switch (event.kind) {

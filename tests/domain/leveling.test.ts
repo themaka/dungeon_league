@@ -4,6 +4,7 @@ import {
   xpFromEvents,
   applyXpAndLevel,
   scaledThresholds,
+  xpMultiplierFor,
 } from "domain/leveling";
 import type { Character, SimEvent } from "domain/types";
 
@@ -118,5 +119,45 @@ describe("leveling", () => {
     ];
     const xp = xpFromEvents(c, events);
     expect(Number.isInteger(xp)).toBe(true);
+  });
+
+  describe("xpMultiplierFor", () => {
+    it("returns UTILITY_XP_LIFT (3.0) for Utility role + Utility-role event (regardless of specialty match)", () => {
+      const thiefChar = mkChar({
+        class: "Rogue", role: "Utility", specialty: "Thief",
+      });
+      // disarm_trap IS in Utility role set AND IS Thief specialty-core → 3.0 (floor fix)
+      expect(xpMultiplierFor(thiefChar, true, true)).toBe(3.0);
+      // save_pass IS in Utility role set, not Thief specialty-core → 3.0 (regular lift)
+      expect(xpMultiplierFor(thiefChar, true, false)).toBe(3.0);
+    });
+
+    it("returns SPECIALTY_XP_BONUS (1.5) for non-Utility role + role/specialty match", () => {
+      const championChar = mkChar({
+        class: "Fighter", role: "DPS", specialty: "Champion",
+      });
+      // crit IS in DPS role set AND IS Champion specialty-core → 1.5
+      expect(xpMultiplierFor(championChar, true, true)).toBe(1.5);
+    });
+
+    it("returns 1.0 for role-only or specialty-only (no compound)", () => {
+      const championChar = mkChar({
+        class: "Fighter", role: "DPS", specialty: "Champion",
+      });
+      // role-only (e.g. DPS hit on a non-Champion DPS would be true,false)
+      expect(xpMultiplierFor(championChar, true, false)).toBe(1.0);
+      // specialty-only (e.g. an event in specialty.coreEvents but not the role set)
+      expect(xpMultiplierFor(championChar, false, true)).toBe(1.0);
+    });
+
+    it("returns 1.0 for Utility role + specialty-only event (floor fix is gated on role membership)", () => {
+      // Utility character whose specialty-core event is NOT in the Utility role set
+      // falls through to the 1.0 fallback. The floor fix only applies to events
+      // that are in the Utility role set.
+      const utilityChar = mkChar({
+        class: "Rogue", role: "Utility", specialty: "Thief",
+      });
+      expect(xpMultiplierFor(utilityChar, false, true)).toBe(1.0);
+    });
   });
 });
