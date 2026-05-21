@@ -170,6 +170,6 @@ export function xpScaleFor(
   if (startXp === undefined || targetXp === undefined) return 1.0;
   const presetRange = targetXp - startXp;
   if (presetRange <= 0) return 1.0;
-  if (settings.seasonWeeks <= 0) return 1.0;
+  if (!Number.isFinite(settings.seasonWeeks) || settings.seasonWeeks <= 0) return 1.0;
   return (baselineRange * settings.seasonWeeks) / (presetRange * baselineWeeks);
 }

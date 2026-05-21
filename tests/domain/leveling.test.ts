@@ -275,5 +275,17 @@ describe("leveling", () => {
       expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: -5 }))
         .toBe(1.0);
     });
+
+    it("returns 1.0 guard when seasonWeeks is undefined / null / NaN (malformed input)", () => {
+      // Preserves the defensive `?? 10` clamp from the old service-layer formula.
+      // LeagueSettings.seasonWeeks is typed as number, but DB rows or test
+      // fixtures could produce nullish values.
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: undefined as unknown as number }))
+        .toBe(1.0);
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: null as unknown as number }))
+        .toBe(1.0);
+      expect(xpScaleFor({ startingLevel: 3, targetLevel: 13, seasonWeeks: NaN }))
+        .toBe(1.0);
+    });
   });
 });
