@@ -12,8 +12,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <div className="app-container">
-          <header className="app-header">
+          <header className="app-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <a href="/" className="logo">Dungeon League</a>
+            <a href="/help" style={{ fontSize: "0.9rem" }}>Help</a>
           </header>
           <main className="app-main">{children}</main>
         </div>

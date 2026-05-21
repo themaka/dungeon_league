@@ -1,36 +1,31 @@
 export type Role = "Tank" | "Healer" | "DPS" | "Utility";
 
 export type Race =
-  | "Human"
-  | "Elf"
-  | "Dwarf"
-  | "Halfling"
-  | "Orc"
-  | "Gnome"
-  | "Tiefling"
-  | "Dragonborn";
+  | "Human" | "Elf" | "Dwarf" | "Halfling"
+  | "Orc" | "Gnome" | "Tiefling" | "Dragonborn";
 
 export type CharacterClass =
-  | "Fighter"
-  | "Wizard"
-  | "Rogue"
-  | "Cleric"
-  | "Ranger"
-  | "Paladin"
-  | "Barbarian"
-  | "Bard"
-  | "Druid"
-  | "Warlock"
-  | "Monk"
-  | "Sorcerer";
+  | "Fighter" | "Wizard" | "Rogue" | "Cleric"
+  | "Ranger" | "Paladin" | "Barbarian" | "Bard"
+  | "Druid" | "Warlock" | "Monk" | "Sorcerer";
+
+export type Specialty =
+  | "Battle Master" | "Champion"
+  | "Evoker" | "War Mage"
+  | "Assassin" | "Thief"
+  | "Life Domain" | "War Domain"
+  | "Hunter" | "Gloom Stalker"
+  | "Devotion" | "Vengeance"
+  | "Berserker" | "Totem Warrior"
+  | "Lore" | "Swords"
+  | "Shepherd" | "Wildfire"
+  | "Fiend" | "Hexblade"
+  | "Open Hand" | "Shadow"
+  | "Draconic" | "Wild Magic";
 
 export interface Stats {
-  str: number;
-  dex: number;
-  con: number;
-  int: number;
-  wis: number;
-  cha: number;
+  str: number; dex: number; con: number;
+  int: number; wis: number; cha: number;
 }
 
 export interface Character {
@@ -39,8 +34,11 @@ export interface Character {
   race: Race;
   class: CharacterClass;
   role: Role;
+  specialty: Specialty;
   stats: Stats;
   level: number;
+  xp: number;
+  abilityTiers: number[];
   description: string;
 }
 
@@ -70,7 +68,7 @@ export interface AIPersonality {
   seed: number;
 }
 
-export type EncounterType = "combat" | "trap" | "puzzle" | "treasure";
+export type EncounterType = "combat" | "trap" | "puzzle" | "treasure" | "social" | "arcane";
 
 export interface Encounter {
   id: string;
@@ -89,17 +87,16 @@ export interface Dungeon {
 }
 
 export type EventKind =
-  | "hit"
-  | "kill"
-  | "crit"
-  | "heal"
-  | "damage_taken"
-  | "save_pass"
-  | "save_fail"
-  | "disarm_trap"
-  | "find_treasure"
-  | "ko"
-  | "death";
+  | "hit" | "kill" | "crit"
+  | "heal" | "damage_taken"
+  | "save_pass" | "save_fail"
+  | "disarm_trap" | "find_treasure"
+  | "ko" | "death"
+  | "buff" | "buff_proc"
+  | "block" | "taunt"
+  | "persuade" | "deceive" | "intimidate"
+  | "dispel" | "channel" | "arcane_surge"
+  | "multiattack" | "sneak_attack" | "smite" | "rage" | "revivify";
 
 export interface SimEvent {
   kind: EventKind;
@@ -112,12 +109,9 @@ export interface SimEvent {
 }
 
 export type MilestoneKind =
-  | "mvp_of_run"
-  | "clutch_survivor"
-  | "first_blood"
-  | "boss_killer"
-  | "flawless_run"
-  | "total_party_wipe";
+  | "mvp_of_run" | "clutch_survivor" | "first_blood"
+  | "boss_killer" | "flawless_run" | "total_party_wipe"
+  | "revivify_save";
 
 export interface Milestone {
   kind: MilestoneKind;
@@ -128,6 +122,7 @@ export interface CharacterScore {
   characterId: string;
   basePoints: number;
   roleMultiplierPoints: number;
+  specialtyBonusPoints: number;
   milestonePoints: number;
   totalPoints: number;
 }
@@ -151,6 +146,7 @@ export interface Highlight {
   actorIds: string[];
   description: string;
   importance: "high" | "medium" | "low";
+  points?: number;
 }
 
 export interface Matchup {
@@ -167,6 +163,23 @@ export interface Matchup {
 
 export type LeaguePhase = "draft" | "regular" | "playoffs" | "complete";
 
+export type ScoutingVisibility = "full" | "partial" | "hidden";
+export type DraftFormat = "snake" | "auction";
+export type EncounterCount = "3-5" | "5-8" | "7-10";
+export type PresetName = "standard" | "quick" | "epic" | "champions" | "veterans";
+
+export interface ScoutingReport {
+  characterId: string;
+  runs: number;
+  avgPoints: number;
+  pointsByEventType: Record<string, number>;
+  bestEncounterType: EncounterType;
+  worstEncounterType: EncounterType;
+  specialtyProcRate: number;
+  consistencyScore: number;
+  projectedValue: number;
+}
+
 export interface League {
   id: string;
   name: string;
@@ -175,6 +188,7 @@ export interface League {
   teams: string[];
   characterPool: string[];
   settings: LeagueSettings;
+  scoutingReports?: Record<string, ScoutingReport>;
 }
 
 export interface LeagueSettings {
@@ -183,31 +197,42 @@ export interface LeagueSettings {
   activeSize: number;
   seasonWeeks: number;
   playoffWeeks: number;
-  draftFormat: "snake";
+  playoffTeams: number;
+  draftFormat: DraftFormat;
   contentSource: "procedural";
+  scoutingRuns: number;
+  scoutingVisibility: ScoutingVisibility;
+  startingLevel: number;
+  targetLevel: number;
+  maxLevel: number;
+  encounterCount: EncounterCount;
+  characterPool: number;
+  xpEnabled: boolean;
+  preset: PresetName;
 }
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   teamCount: 6,
   rosterSize: 6,
   activeSize: 4,
-  seasonWeeks: 5,
-  playoffWeeks: 2,
+  seasonWeeks: 10,
+  playoffWeeks: 3,
+  playoffTeams: 4,
   draftFormat: "snake",
   contentSource: "procedural",
+  scoutingRuns: 5,
+  scoutingVisibility: "full",
+  startingLevel: 3,
+  targetLevel: 13,
+  maxLevel: 20,
+  encounterCount: "5-8",
+  characterPool: 48,
+  xpEnabled: true,
+  preset: "standard",
 };
 
 export const CLASS_ROLE_MAP: Record<CharacterClass, Role> = {
-  Fighter: "DPS",
-  Wizard: "DPS",
-  Rogue: "Utility",
-  Cleric: "Healer",
-  Ranger: "DPS",
-  Paladin: "Tank",
-  Barbarian: "Tank",
-  Bard: "Utility",
-  Druid: "Healer",
-  Warlock: "DPS",
-  Monk: "DPS",
-  Sorcerer: "DPS",
+  Fighter: "DPS", Wizard: "DPS", Rogue: "Utility", Cleric: "Healer",
+  Ranger: "DPS", Paladin: "Tank", Barbarian: "Tank", Bard: "Utility",
+  Druid: "Healer", Warlock: "DPS", Monk: "DPS", Sorcerer: "DPS",
 };

@@ -149,12 +149,12 @@ Matchup Margin Distribution:
 - **Play-by-play encounter names** (`33a887f`) — Added encounter name map so hits/kills show "Goblin Ambush" instead of "enc-w1-m0-0".
 - **Export filename** (`fc94f03`) — Download filename uses league name instead of ID.
 
-## Open Issues (from playtest)
+## Closed Issues (from playtest)
 
-1. **Team naming** — Players can't name their team (hardcoded "Your Team")
-2. **Highlights missing team context** — No indication which team a highlighted character belongs to
-3. **Stat table missing role column** — Points breakdown shows "Role" column but not what role each character is
-4. **Save highlights lack context** — Generic "resisted the danger" instead of naming the encounter (future feature)
+1. ~~**Team naming**~~ — Resolved in `7e991cd` (team naming added)
+2. ~~**Highlights missing team context**~~ — Resolved in `7e991cd` (highlight team context added)
+3. ~~**Stat table missing role column**~~ — Resolved in `7e991cd` (role column added)
+4. ~~**Save highlights lack context**~~ — Resolved in `1ac3d1b` (encounter context added to play-by-play and highlights)
 
 ## Technical Notes
 

@@ -1,12 +1,19 @@
-import type { Character, CharacterClass, Race, Stats, Dungeon, Encounter, EncounterType } from "domain/types";
+import type {
+  Character, CharacterClass, EncounterCount, EncounterType, LeagueSettings,
+  Race, Stats, Dungeon, Encounter,
+} from "domain/types";
 import { CLASS_ROLE_MAP } from "domain/types";
+import { CLASS_SPECIALTY_MAP, primaryStatForSpecialty } from "domain/specialties";
+import { unlockTierForLevel } from "domain/abilities";
+import { XP_THRESHOLDS, STAT_BUMP_LEVELS, SCALING_LEVELS } from "domain/leveling";
+import { pickEncounterType } from "domain/themes";
 import type { Rng } from "domain/rng";
 import type { ContentSource, HighlightTemplateBundle } from "./content-source";
 import { DEFAULT_HIGHLIGHT_TEMPLATES } from "./highlight-templates";
 import {
   FIRST_NAMES, LAST_NAMES, ADJECTIVES, ADJECTIVES_2, TRAITS, QUIRKS,
   BACKGROUNDS, DESCRIPTION_TEMPLATES, DUNGEON_PREFIXES, DUNGEON_NOUNS,
-  DUNGEON_THEMES, ENCOUNTER_NAMES, BOSS_NAMES,
+  ENCOUNTER_NAMES, BOSS_NAMES,
 } from "./name-tables";
 
 const ALL_RACES: Race[] = [
@@ -18,12 +25,7 @@ const ALL_CLASSES: CharacterClass[] = [
   "Barbarian", "Bard", "Druid", "Warlock", "Monk", "Sorcerer",
 ];
 
-function generateDescription(
-  rng: Rng,
-  name: string,
-  race: Race,
-  charClass: CharacterClass,
-): string {
+function generateDescription(rng: Rng, name: string, race: Race, charClass: CharacterClass): string {
   const template = rng.pick(DESCRIPTION_TEMPLATES);
   return template
     .replace("{name}", name)
@@ -38,22 +40,56 @@ function generateDescription(
 
 function rollStats(rng: Rng): Stats {
   return {
-    str: rng.rollStat(),
-    dex: rng.rollStat(),
-    con: rng.rollStat(),
-    int: rng.rollStat(),
-    wis: rng.rollStat(),
-    cha: rng.rollStat(),
+    str: rng.rollStat(), dex: rng.rollStat(), con: rng.rollStat(),
+    int: rng.rollStat(), wis: rng.rollStat(), cha: rng.rollStat(),
   };
 }
 
+// Total stat bumps a character of the given level has accrued from the leveling
+// system. Mirrors the loop inside applyXpAndLevel — see domain/leveling.ts.
+function statBumpsForLevel(level: number): number {
+  let bumps = 0;
+  for (let l = 2; l <= level; l++) {
+    if (STAT_BUMP_LEVELS.has(l)) bumps += 1;
+    if (SCALING_LEVELS.has(l)) bumps += 1;
+  }
+  return bumps;
+}
+
+function tiersAtLevel(level: number): number[] {
+  const top = unlockTierForLevel(level);
+  const out: number[] = [];
+  for (let t = 1; t <= top; t++) out.push(t);
+  return out;
+}
+
+function targetStatsForType(type: EncounterType, rng: Rng): (keyof Stats)[] {
+  switch (type) {
+    case "combat": return [rng.pick<keyof Stats>(["str", "dex", "int"]), "con"];
+    case "trap": return ["dex", rng.pick<keyof Stats>(["int", "wis"])];
+    case "puzzle": return [rng.pick<keyof Stats>(["int", "wis", "cha"])];
+    case "treasure": return [rng.pick<keyof Stats>(["wis", "dex", "cha"])];
+    case "social": return [rng.pick<keyof Stats>(["cha", "wis", "int"])];
+    case "arcane": return [rng.pick<keyof Stats>(["int", "wis", "cha"])];
+  }
+}
+
+function encounterCountRange(count: EncounterCount): [number, number] {
+  switch (count) {
+    case "3-5": return [3, 5];
+    case "5-8": return [5, 8];
+    case "7-10": return [7, 10];
+  }
+}
+
 export class ProceduralSource implements ContentSource {
-  generateCharacters(count: number, rng: Rng): Character[] {
+  generateCharacters(count: number, rng: Rng, settings: LeagueSettings): Character[] {
     const usedNames = new Set<string>();
     const characters: Character[] = [];
-
     const shuffledFirstNames = rng.shuffle([...FIRST_NAMES]);
     const shuffledLastNames = rng.shuffle([...LAST_NAMES]);
+
+    const startingLevel = settings.startingLevel;
 
     for (let i = 0; i < count; i++) {
       const firstName = shuffledFirstNames[i % shuffledFirstNames.length];
@@ -70,7 +106,14 @@ export class ProceduralSource implements ContentSource {
       const charClass = rng.pick(ALL_CLASSES);
       const race = rng.pick(ALL_RACES);
       const role = CLASS_ROLE_MAP[charClass];
+      const specialty = CLASS_SPECIALTY_MAP[charClass][rng.next() < 0.5 ? 0 : 1];
       const stats = rollStats(rng);
+
+      const primary = primaryStatForSpecialty(specialty);
+      stats[primary] = stats[primary] + statBumpsForLevel(startingLevel);
+
+      // Start at the XP floor for the chosen level (e.g. level 5 => 70 XP).
+      const startingXp = XP_THRESHOLDS[startingLevel] ?? 0;
 
       characters.push({
         id: `char-${i}-${firstName.toLowerCase()}`,
@@ -78,8 +121,11 @@ export class ProceduralSource implements ContentSource {
         race,
         class: charClass,
         role,
+        specialty,
         stats,
-        level: 1,
+        level: startingLevel,
+        xp: startingXp,
+        abilityTiers: tiersAtLevel(startingLevel),
         description: generateDescription(rng, fullName, race, charClass),
       });
     }
@@ -87,24 +133,27 @@ export class ProceduralSource implements ContentSource {
     return characters;
   }
 
-  generateDungeon(week: number, matchupIndex: number, rng: Rng): Dungeon {
+  generateDungeon(
+    week: number,
+    matchupIndex: number,
+    rng: Rng,
+    theme: string,
+    encounterCount: EncounterCount,
+  ): Dungeon {
     const name = `${rng.pick(DUNGEON_PREFIXES)} ${rng.pick(DUNGEON_NOUNS)}`;
-    const theme = rng.pick(DUNGEON_THEMES);
-    const encounterCount = rng.nextInt(5, 8);
-
-    const encounterTypes: EncounterType[] = ["combat", "trap", "puzzle", "treasure"];
-    const statKeys: (keyof Stats)[] = ["str", "dex", "con", "int", "wis", "cha"];
+    const [min, max] = encounterCountRange(encounterCount);
+    const total = rng.nextInt(min, max);
 
     const encounters: Encounter[] = [];
-
-    for (let i = 0; i < encounterCount - 1; i++) {
-      const type = rng.pick(encounterTypes);
+    for (let i = 0; i < total - 1; i++) {
+      const type = pickEncounterType(theme, rng);
+      const names = ENCOUNTER_NAMES[type] ?? ENCOUNTER_NAMES.combat;
       encounters.push({
         id: `enc-w${week}-m${matchupIndex}-${i}`,
         type,
-        name: rng.pick(ENCOUNTER_NAMES[type]),
+        name: rng.pick(names),
         difficulty: rng.nextInt(1, 10),
-        targetStats: [rng.pick(statKeys), rng.pick(statKeys)],
+        targetStats: targetStatsForType(type, rng),
         isBoss: false,
       });
     }
@@ -114,16 +163,11 @@ export class ProceduralSource implements ContentSource {
       type: "combat",
       name: rng.pick(BOSS_NAMES),
       difficulty: rng.nextInt(7, 10),
-      targetStats: [rng.pick(statKeys), rng.pick(statKeys)],
+      targetStats: targetStatsForType("combat", rng),
       isBoss: true,
     });
 
-    return {
-      id: `dungeon-w${week}-m${matchupIndex}`,
-      name,
-      theme,
-      encounters,
-    };
+    return { id: `dungeon-w${week}-m${matchupIndex}`, name, theme, encounters };
   }
 
   getHighlightTemplates(): HighlightTemplateBundle {

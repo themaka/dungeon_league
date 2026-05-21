@@ -29,6 +29,34 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     });
   }
 
+  const playedMatchups = await prisma.matchup.findMany({
+    where: {
+      leagueId: params.id,
+      OR: [{ homeTeamId: params.teamId }, { awayTeamId: params.teamId }],
+      winnerId: { not: null },
+    },
+  });
+
+  const seasonStats: Record<string, { total: number; games: number; lastGame: number | null }> = {};
+  for (const char of team.roster) {
+    seasonStats[char.externalId] = { total: 0, games: 0, lastGame: null };
+  }
+  const orderedMatchups = [...playedMatchups].sort((a, b) => a.week - b.week);
+  for (const m of orderedMatchups) {
+    const run =
+      m.homeTeamId === params.teamId
+        ? (m.homeRunData as any)
+        : (m.awayRunData as any);
+    if (!run?.score?.perCharacter) continue;
+    for (const cs of Object.values<any>(run.score.perCharacter)) {
+      const stat = seasonStats[cs.characterId];
+      if (!stat) continue;
+      stat.total += cs.totalPoints ?? 0;
+      stat.games += 1;
+      stat.lastGame = cs.totalPoints ?? 0;
+    }
+  }
+
   return {
     team,
     league,
@@ -37,6 +65,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       : null,
     isHuman: team.managerType === "human",
     postDraft,
+    seasonStats,
   };
 }
 
@@ -72,7 +101,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function TeamPage({ loaderData }: Route.ComponentProps) {
-  const { team, league, lineup, isHuman, postDraft } = loaderData;
+  const { team, league, lineup, isHuman, postDraft, seasonStats } = loaderData;
   const fetcher = useFetcher();
 
   const handleSwap = (activeId: string, benchId: string) => {
@@ -107,12 +136,13 @@ export default function TeamPage({ loaderData }: Route.ComponentProps) {
           bench={lineup.bench}
           onSwap={handleSwap}
           readOnly={!isHuman}
+          seasonStats={seasonStats}
         />
       ) : (
         <div>
           <h2>Roster</h2>
           {team.roster.map((char: any) => (
-            <CharacterCard key={char.id} character={char} />
+            <CharacterCard key={char.id} character={char} seasonStats={seasonStats[char.externalId]} />
           ))}
         </div>
       )}

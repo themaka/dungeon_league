@@ -68,7 +68,7 @@ export default function DraftRoom({ loaderData }: Route.ComponentProps) {
 
   return (
     <div>
-      <h1>Draft Room</h1>
+      <h1>{data.leagueName} &mdash; Drafting</h1>
       <div style={{ marginBottom: "1rem" }} className="card">
         <p>
           Pick {data.currentPick + 1} of {data.totalPicks} &mdash;{" "}
@@ -103,7 +103,7 @@ export default function DraftRoom({ loaderData }: Route.ComponentProps) {
             <p style={{ color: "var(--ink-light)", fontSize: "0.9rem" }}>No characters drafted yet.</p>
           ) : (
             data.myRoster.map((char: any) => (
-              <CharacterCard key={char.id} character={char} compact />
+              <CharacterCard key={char.id} character={char} compact expandable />
             ))
           )}
         </div>

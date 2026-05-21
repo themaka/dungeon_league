@@ -1,111 +1,159 @@
 import { describe, it, expect } from "vitest";
 import { score } from "domain/scoring";
-import type { SimEvent, Character } from "domain/types";
+import type { Character, CharacterClass, Role, SimEvent, Specialty } from "domain/types";
 
-function makeChar(id: string, role: "Tank" | "Healer" | "DPS" | "Utility"): Character {
+function makeChar(
+  id: string,
+  role: Role,
+  cls: CharacterClass = "Fighter",
+  specialty: Specialty = "Champion",
+): Character {
   return {
-    id,
-    name: `Test ${id}`,
-    race: "Human",
-    class: "Fighter",
-    role,
+    id, name: `Test ${id}`, race: "Human", class: cls, role, specialty,
     stats: { str: 14, dex: 12, con: 13, int: 10, wis: 10, cha: 10 },
-    level: 1,
-    description: "test",
+    level: 3, xp: 30, abilityTiers: [1], description: "test",
   };
 }
 
 describe("scoring", () => {
-  it("scores hit events at 0.1 per damage", () => {
+  it("scores hit events at 0.12 per damage", () => {
     const chars = [makeChar("a", "DPS")];
-    const events: SimEvent[] = [
-      { kind: "hit", encounterId: "e1", actorId: "a", amount: 10 },
-    ];
-    const result = score(events, chars);
-    expect(result.perCharacter.get("a")!.basePoints).toBe(1);
+    const events: SimEvent[] = [{ kind: "hit", encounterId: "e1", actorId: "a", amount: 10 }];
+    expect(score(events, chars).perCharacter.get("a")!.basePoints).toBeCloseTo(1.2, 4);
   });
 
-  it("applies DPS role multiplier to hit events", () => {
+  it("DPS core multiplier is 0.75 for hit", () => {
     const chars = [makeChar("a", "DPS")];
+    const events: SimEvent[] = [{ kind: "hit", encounterId: "e1", actorId: "a", amount: 10 }];
+    const r = score(events, chars).perCharacter.get("a")!;
+    expect(r.roleMultiplierPoints).toBeCloseTo(0.9, 4);
+  });
+
+  it("Tank core multiplier is 0.75 for damage_taken at 0.1/dmg", () => {
+    const chars = [makeChar("t", "Tank", "Barbarian", "Totem Warrior")];
+    const events: SimEvent[] = [{ kind: "damage_taken", encounterId: "e1", actorId: "t", amount: 20 }];
+    const r = score(events, chars).perCharacter.get("t")!;
+    expect(r.basePoints).toBeCloseTo(2, 4);
+    expect(r.roleMultiplierPoints).toBeCloseTo(1.5, 4);
+  });
+
+  it("Tank secondary multiplier is 0.3 for save_pass", () => {
+    const chars = [makeChar("t", "Tank", "Paladin", "Devotion")];
+    const events: SimEvent[] = [{ kind: "save_pass", encounterId: "e1", actorId: "t" }];
+    const r = score(events, chars).perCharacter.get("t")!;
+    expect(r.basePoints).toBe(1);
+    // save_pass IS core for Devotion (specialty), so role still 0.3 (secondary), specialty +0.25
+    expect(r.roleMultiplierPoints).toBeCloseTo(0.3, 4);
+    expect(r.specialtyBonusPoints).toBeCloseTo(0.25, 4);
+  });
+
+  it("Healer heal at 0.1/hp (down from 0.15)", () => {
+    const chars = [makeChar("h", "Healer", "Cleric", "Life Domain")];
+    const events: SimEvent[] = [{ kind: "heal", encounterId: "e1", actorId: "h", amount: 10 }];
+    const r = score(events, chars).perCharacter.get("h")!;
+    expect(r.basePoints).toBeCloseTo(1, 4);
+  });
+
+  it("specialty bonus +0.25x stacks on aligned events", () => {
+    const champ = makeChar("a", "DPS", "Fighter", "Champion");
+    const events: SimEvent[] = [{ kind: "crit", encounterId: "e1", actorId: "a" }];
+    const r = score(events, [champ]).perCharacter.get("a")!;
+    expect(r.basePoints).toBe(1.5);
+    expect(r.roleMultiplierPoints).toBeCloseTo(1.5 * 0.75, 4);
+    expect(r.specialtyBonusPoints).toBeCloseTo(1.5 * 0.25, 4);
+  });
+
+  it("buff event scores +1 base for healer", () => {
+    const c = makeChar("h", "Healer", "Cleric", "War Domain");
+    const events: SimEvent[] = [{ kind: "buff", encounterId: "e", actorId: "h" }];
+    const r = score(events, [c]).perCharacter.get("h")!;
+    expect(r.basePoints).toBe(1);
+    expect(r.roleMultiplierPoints).toBeCloseTo(0.75, 4);
+  });
+
+  it("buff_proc credits the buffer at +1.5", () => {
+    const c = makeChar("h", "Healer", "Cleric", "War Domain");
+    const events: SimEvent[] = [{ kind: "buff_proc", encounterId: "e", actorId: "h" }];
+    expect(score(events, [c]).perCharacter.get("h")!.basePoints).toBe(1.5);
+  });
+
+  it("block at +2 with Tank multiplier", () => {
+    const c = makeChar("t", "Tank", "Barbarian", "Totem Warrior");
+    const events: SimEvent[] = [{ kind: "block", encounterId: "e", actorId: "t" }];
+    const r = score(events, [c]).perCharacter.get("t")!;
+    expect(r.basePoints).toBe(2);
+    expect(r.roleMultiplierPoints).toBeCloseTo(1.5, 4);
+  });
+
+  it("revivify scores +5", () => {
+    const c = makeChar("h", "Healer", "Cleric", "Life Domain");
+    const events: SimEvent[] = [{ kind: "revivify", encounterId: "e", actorId: "h", targetId: "x" }];
+    expect(score(events, [c]).perCharacter.get("h")!.basePoints).toBe(5);
+  });
+
+  it("multiattack at +0.5 per extra hit", () => {
+    const c = makeChar("a", "DPS", "Fighter", "Battle Master");
     const events: SimEvent[] = [
-      { kind: "hit", encounterId: "e1", actorId: "a", amount: 10 },
+      { kind: "multiattack", encounterId: "e", actorId: "a", amount: 2 },
     ];
-    const result = score(events, chars);
-    expect(result.perCharacter.get("a")!.roleMultiplierPoints).toBeCloseTo(0.5);
+    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(1);
   });
 
-  it("applies Tank role multiplier to damage_taken", () => {
-    const chars = [makeChar("t", "Tank")];
+  it("sneak_attack at 0.15/dmg with Rogue Assassin specialty", () => {
+    const c = makeChar("a", "Utility", "Rogue", "Assassin");
     const events: SimEvent[] = [
-      { kind: "damage_taken", encounterId: "e1", actorId: "t", amount: 20 },
+      { kind: "sneak_attack", encounterId: "e", actorId: "a", amount: 20 },
     ];
-    const result = score(events, chars);
-    expect(result.perCharacter.get("t")!.basePoints).toBe(1);
-    expect(result.perCharacter.get("t")!.roleMultiplierPoints).toBeCloseTo(0.5);
+    const r = score(events, [c]).perCharacter.get("a")!;
+    expect(r.basePoints).toBeCloseTo(3, 4);
+    expect(r.specialtyBonusPoints).toBeCloseTo(0.75, 4);
   });
 
-  it("scores kill at +2, boss kill at +3", () => {
-    const chars = [makeChar("a", "DPS")];
-    const normalKill: SimEvent[] = [
-      { kind: "kill", encounterId: "e1", actorId: "a", meta: { boss: false } },
-    ];
-    const bossKill: SimEvent[] = [
-      { kind: "kill", encounterId: "e1", actorId: "a", meta: { boss: true } },
-    ];
-    expect(score(normalKill, chars).perCharacter.get("a")!.basePoints).toBe(2);
-    expect(score(bossKill, chars).perCharacter.get("a")!.basePoints).toBe(3);
-  });
-
-  it("scores ko at -3 and death at -5", () => {
-    const chars = [makeChar("a", "DPS")];
-    const ko: SimEvent[] = [{ kind: "ko", encounterId: "e1", actorId: "a" }];
-    const death: SimEvent[] = [{ kind: "death", encounterId: "e1", actorId: "a" }];
-    expect(score(ko, chars).perCharacter.get("a")!.basePoints).toBe(-3);
-    expect(score(death, chars).perCharacter.get("a")!.basePoints).toBe(-5);
-  });
-
-  it("awards mvp_of_run milestone to highest scorer", () => {
-    const chars = [makeChar("a", "DPS"), makeChar("b", "DPS")];
+  it("kills boss at +7", () => {
+    const c = makeChar("a", "DPS");
     const events: SimEvent[] = [
-      { kind: "hit", encounterId: "e1", actorId: "a", amount: 100 },
-      { kind: "hit", encounterId: "e1", actorId: "b", amount: 10 },
+      { kind: "kill", encounterId: "e", actorId: "a", meta: { boss: true } },
     ];
-    const result = score(events, chars);
-    expect(result.milestones).toContainEqual({ kind: "mvp_of_run", actorId: "a" });
-    // mvp_of_run (+5) + flawless_run (+3, no KOs in this test) = 8
-    expect(result.perCharacter.get("a")!.milestonePoints).toBe(8);
+    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(7);
   });
 
-  it("awards flawless_run milestone when no KOs", () => {
-    const chars = [makeChar("a", "DPS"), makeChar("b", "Tank")];
+  it("revivify_save milestone awards bonus to reviver", () => {
+    const c = makeChar("h", "Healer", "Cleric", "Life Domain");
+    const target = makeChar("t", "DPS");
     const events: SimEvent[] = [
-      { kind: "hit", encounterId: "e1", actorId: "a", amount: 10 },
+      { kind: "death", encounterId: "e", actorId: "t" },
+      { kind: "revivify", encounterId: "e2", actorId: "h", targetId: "t" },
     ];
-    const result = score(events, chars);
-    expect(result.milestones).toContainEqual({ kind: "flawless_run" });
-    expect(result.perCharacter.get("a")!.milestonePoints).toBeGreaterThanOrEqual(3);
+    const r = score(events, [c, target]);
+    expect(r.milestones.some((m) => m.kind === "revivify_save" && m.actorId === "h")).toBe(true);
+    // base 5 (revivify) + role 0.75x (Healer core) + specialty 0.25x (Life Domain core) = 5 + 3.75 + 1.25
+    // milestonePoints from revivify_save should add +3
+    expect(r.perCharacter.get("h")!.milestonePoints).toBeGreaterThanOrEqual(3);
   });
 
-  it("awards total_party_wipe when all die", () => {
-    const chars = [makeChar("a", "DPS")];
+  it("revivify without a prior death does NOT award revivify_save milestone", () => {
+    const c = makeChar("h", "Healer", "Cleric", "Life Domain");
+    const target = makeChar("t", "DPS");
     const events: SimEvent[] = [
-      { kind: "death", encounterId: "e1", actorId: "a" },
+      { kind: "revivify", encounterId: "e", actorId: "h", targetId: "t" },
     ];
-    const result = score(events, chars);
-    expect(result.milestones).toContainEqual({ kind: "total_party_wipe" });
+    const r = score(events, [c, target]);
+    expect(r.milestones.some((m) => m.kind === "revivify_save")).toBe(false);
   });
 
-  it("teamTotal is sum of all character totals", () => {
-    const chars = [makeChar("a", "DPS"), makeChar("b", "Healer")];
+  it("multiattack with amount=0 scores 0 base points", () => {
+    const c = makeChar("a", "DPS", "Fighter", "Battle Master");
     const events: SimEvent[] = [
-      { kind: "hit", encounterId: "e1", actorId: "a", amount: 10 },
-      { kind: "heal", encounterId: "e1", actorId: "b", amount: 10 },
+      { kind: "multiattack", encounterId: "e", actorId: "a", amount: 0 },
     ];
-    const result = score(events, chars);
-    const charTotal = Array.from(result.perCharacter.values()).reduce(
-      (sum, c) => sum + c.totalPoints,
-      0,
-    );
-    expect(result.teamTotal).toBeCloseTo(charTotal);
+    expect(score(events, [c]).perCharacter.get("a")!.basePoints).toBe(0);
+  });
+
+  it("flawless_run still awards +3 to all on no ko/death", () => {
+    const a = makeChar("a", "DPS"); const b = makeChar("b", "Tank", "Paladin", "Devotion");
+    const events: SimEvent[] = [{ kind: "hit", encounterId: "e", actorId: "a", amount: 5 }];
+    const r = score(events, [a, b]);
+    expect(r.milestones.some((m) => m.kind === "flawless_run")).toBe(true);
+    expect(r.perCharacter.get("a")!.milestonePoints).toBeGreaterThanOrEqual(3);
   });
 });

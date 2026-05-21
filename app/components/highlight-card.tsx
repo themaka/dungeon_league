@@ -11,6 +11,7 @@ interface HighlightCardProps {
     actorIds: string[];
     description: string;
     importance: "high" | "medium" | "low";
+    points?: number;
   };
   teamName?: string;
   characterNames?: Record<string, string>;
@@ -86,6 +87,9 @@ export function HighlightCard({ highlight, teamName, characterNames = {}, charac
       <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.25rem" }}>
         <span style={{ fontSize: "0.75rem", color: "var(--ink-light)", textTransform: "uppercase" }}>
           {highlight.kind.replace("_", " ")}
+          {highlight.points !== undefined && (
+            <> — {highlight.points >= 0 ? "+" : ""}{highlight.points.toFixed(1)} pts</>
+          )}
         </span>
         {teamName && (
           <span style={{ fontSize: "0.75rem", color: "var(--ink-light)" }}>

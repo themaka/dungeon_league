@@ -1,35 +1,87 @@
-import type { Character, CharacterScore, EventKind, Milestone, ScoreResult, SimEvent } from "./types";
+import type {
+  Character, CharacterScore, EventKind, Milestone, Role, ScoreResult, SimEvent,
+} from "./types";
+import { isCoreEventForSpecialty } from "./specialties";
+
+export interface ScoreOptions {
+  // Optional extra secondary role events. Merged into ROLE_SECONDARY_EVENTS at
+  // scoring time. Lets the sandbox A/B "what if hit was Healer secondary?"
+  // without forking the engine.
+  extraSecondaryByRole?: Partial<Record<Role, Set<EventKind>>>;
+}
 
 const BASE_POINTS: Record<EventKind, number | ((e: SimEvent) => number)> = {
-  hit: (e) => (e.amount ?? 0) * 0.1,
-  kill: (e) => (e.meta?.boss ? 3 : 2),
-  crit: 1,
-  heal: (e) => (e.amount ?? 0) * 0.15,
-  damage_taken: (e) => (e.amount ?? 0) * 0.05,
+  hit: (e) => (e.amount ?? 0) * 0.12,
+  kill: (e) => (e.meta?.boss ? 7 : 2),
+  crit: 1.5,
+  heal: (e) => (e.amount ?? 0) * 0.1,
+  damage_taken: (e) => (e.amount ?? 0) * 0.1,
   save_pass: 1,
   save_fail: -0.5,
   disarm_trap: 2,
   find_treasure: 3,
   ko: -3,
   death: -5,
+  buff: 1,
+  buff_proc: 1.5,
+  block: 2,
+  taunt: 1.5,
+  persuade: 1.5,
+  deceive: 1.5,
+  intimidate: 1.5,
+  dispel: 2,
+  channel: 1,
+  arcane_surge: 3,
+  multiattack: (e) => (e.amount ?? 0) * 0.5,
+  sneak_attack: (e) => (e.amount ?? 0) * 0.15,
+  smite: (e) => (e.amount ?? 0) * 0.15,
+  rage: 1,
+  revivify: 5,
 };
 
-const ROLE_MULTIPLIED_EVENTS: Record<string, Set<EventKind>> = {
-  Tank: new Set(["damage_taken", "save_pass"]),
-  Healer: new Set(["heal", "save_pass"]),
-  DPS: new Set(["hit", "kill", "crit"]),
-  Utility: new Set(["disarm_trap", "find_treasure", "save_pass"]),
+// Role multipliers — events that magnify scoring for matching roles.
+// Penalty events (save_fail, ko, death) are intentionally excluded:
+// they apply equally to all roles and don't warrant role-based amplification.
+const ROLE_CORE_EVENTS: Record<string, Set<EventKind>> = {
+  Tank: new Set(["block", "taunt", "damage_taken"]),
+  Healer: new Set(["heal", "buff", "buff_proc", "revivify"]),
+  DPS: new Set(["hit", "kill", "crit", "sneak_attack", "smite", "arcane_surge"]),
+  Utility: new Set(["disarm_trap", "find_treasure", "persuade", "deceive"]),
 };
 
-const ROLE_MULTIPLIER = 0.5;
+const ROLE_SECONDARY_EVENTS: Record<string, Set<EventKind>> = {
+  Tank: new Set(["save_pass", "intimidate"]),
+  Healer: new Set(["save_pass", "channel"]),
+  DPS: new Set(["multiattack", "rage"]),
+  Utility: new Set(["buff_proc", "dispel"]),
+};
+
+const ROLE_CORE_MULT = 0.75;
+const ROLE_SECONDARY_MULT = 0.3;
+const SPECIALTY_BONUS_MULT = 0.25;
 
 function basePointsFor(event: SimEvent): number {
   const calc = BASE_POINTS[event.kind];
+  if (calc === undefined) return 0;
   if (typeof calc === "function") return calc(event);
   return calc;
 }
 
-export function score(events: SimEvent[], roster: Character[]): ScoreResult {
+export function pointsForEvent(event: SimEvent, character: Character, opts: ScoreOptions = {}): number {
+  const base = basePointsFor(event);
+  let total = base;
+  const core = ROLE_CORE_EVENTS[character.role];
+  const secondary = ROLE_SECONDARY_EVENTS[character.role];
+  const extra = opts.extraSecondaryByRole?.[character.role as Role];
+  if (core?.has(event.kind)) total += base * ROLE_CORE_MULT;
+  else if (secondary?.has(event.kind) || extra?.has(event.kind)) total += base * ROLE_SECONDARY_MULT;
+  if (isCoreEventForSpecialty(character.specialty, event.kind)) {
+    total += base * SPECIALTY_BONUS_MULT;
+  }
+  return total;
+}
+
+export function score(events: SimEvent[], roster: Character[], opts: ScoreOptions = {}): ScoreResult {
   const charMap = new Map(roster.map((c) => [c.id, c]));
   const scores = new Map<string, CharacterScore>();
 
@@ -38,6 +90,7 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
       characterId: char.id,
       basePoints: 0,
       roleMultiplierPoints: 0,
+      specialtyBonusPoints: 0,
       milestonePoints: 0,
       totalPoints: 0,
     });
@@ -46,16 +99,23 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
   for (const event of events) {
     const cs = scores.get(event.actorId);
     if (!cs) continue;
+    const char = charMap.get(event.actorId);
+    if (!char) continue;
 
     const base = basePointsFor(event);
     cs.basePoints += base;
 
-    const char = charMap.get(event.actorId);
-    if (char) {
-      const multipliedEvents = ROLE_MULTIPLIED_EVENTS[char.role];
-      if (multipliedEvents?.has(event.kind)) {
-        cs.roleMultiplierPoints += base * ROLE_MULTIPLIER;
-      }
+    const core = ROLE_CORE_EVENTS[char.role];
+    const secondary = ROLE_SECONDARY_EVENTS[char.role];
+    const extra = opts.extraSecondaryByRole?.[char.role as Role];
+    if (core?.has(event.kind)) {
+      cs.roleMultiplierPoints += base * ROLE_CORE_MULT;
+    } else if (secondary?.has(event.kind) || extra?.has(event.kind)) {
+      cs.roleMultiplierPoints += base * ROLE_SECONDARY_MULT;
+    }
+
+    if (isCoreEventForSpecialty(char.specialty, event.kind)) {
+      cs.specialtyBonusPoints += base * SPECIALTY_BONUS_MULT;
     }
   }
 
@@ -64,17 +124,13 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
   const hasKoOrDeath = events.some((e) => e.kind === "ko" || e.kind === "death");
   if (!hasKoOrDeath && events.length > 0) {
     milestones.push({ kind: "flawless_run" });
-    for (const cs of scores.values()) {
-      cs.milestonePoints += 3;
-    }
+    for (const cs of scores.values()) cs.milestonePoints += 3;
   }
 
   const allDead = roster.every((c) => events.some((e) => e.kind === "death" && e.actorId === c.id));
-  if (allDead) {
+  if (allDead && roster.length > 0) {
     milestones.push({ kind: "total_party_wipe" });
-    for (const cs of scores.values()) {
-      cs.milestonePoints += -10;
-    }
+    for (const cs of scores.values()) cs.milestonePoints += -10;
   }
 
   const firstKill = events.find((e) => e.kind === "kill");
@@ -91,12 +147,23 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
     if (cs) cs.milestonePoints += 5;
   }
 
+  const deadIds = new Set<string>();
+  for (const e of events) {
+    if (e.kind === "death") deadIds.add(e.actorId);
+    if (e.kind === "revivify" && e.targetId && deadIds.has(e.targetId)) {
+      milestones.push({ kind: "revivify_save", actorId: e.actorId });
+      const cs = scores.get(e.actorId);
+      if (cs) cs.milestonePoints += 3;
+      deadIds.delete(e.targetId);
+    }
+  }
+
   let mvpId: string | undefined;
   let mvpPoints = -Infinity;
   for (const cs of scores.values()) {
-    const preMilestone = cs.basePoints + cs.roleMultiplierPoints;
-    if (preMilestone > mvpPoints) {
-      mvpPoints = preMilestone;
+    const pre = cs.basePoints + cs.roleMultiplierPoints + cs.specialtyBonusPoints;
+    if (pre > mvpPoints) {
+      mvpPoints = pre;
       mvpId = cs.characterId;
     }
   }
@@ -106,7 +173,6 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
     if (cs) cs.milestonePoints += 5;
   }
 
-  // clutch_survivor: a character was KO'd but not killed — survived clutch.
   for (const char of roster) {
     const wasKod = events.some((e) => e.kind === "ko" && e.actorId === char.id);
     const wasDead = events.some((e) => e.kind === "death" && e.actorId === char.id);
@@ -119,7 +185,8 @@ export function score(events: SimEvent[], roster: Character[]): ScoreResult {
 
   let teamTotal = 0;
   for (const cs of scores.values()) {
-    cs.totalPoints = cs.basePoints + cs.roleMultiplierPoints + cs.milestonePoints;
+    cs.totalPoints =
+      cs.basePoints + cs.roleMultiplierPoints + cs.specialtyBonusPoints + cs.milestonePoints;
     teamTotal += cs.totalPoints;
   }
 

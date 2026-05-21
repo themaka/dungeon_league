@@ -66,3 +66,28 @@ describe("draft service", () => {
     expect(updated.currentPick).toBeGreaterThan(beforePick);
   });
 });
+
+describe("getDraftState — scouting", () => {
+  it("includes a scouting report per available character on full visibility", async () => {
+    const league = await createLeague("Scout Vis", "user-3", "Team", { preset: "standard" });
+    const state = await getDraftState(league.id);
+    for (const c of state.available) {
+      expect((c as any).scouting).toBeDefined();
+      expect((c as any).scouting.avgPoints).toBeDefined();
+    }
+  });
+
+  it("returns specialty alongside class/role", async () => {
+    const league = await createLeague("Spec", "user-3", "Team", { preset: "standard" });
+    const state = await getDraftState(league.id);
+    expect((state.available[0] as any).specialty).toBeDefined();
+  });
+
+  it("hides performance data on hidden visibility", async () => {
+    const league = await createLeague("Hidden", "user-3", "Team", {
+      preset: "standard", scoutingVisibility: "hidden",
+    });
+    const state = await getDraftState(league.id);
+    expect((state.available[0] as any).scouting).toBeUndefined();
+  });
+});

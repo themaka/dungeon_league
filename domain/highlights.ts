@@ -1,5 +1,6 @@
 import type { Character, Dungeon, Highlight, SimEvent } from "./types";
 import { DEFAULT_HIGHLIGHT_TEMPLATES } from "./content/highlight-templates";
+import { pointsForEvent } from "./scoring";
 
 const MAX_HIGHLIGHTS = 10;
 
@@ -37,7 +38,8 @@ export function generateHighlights(
   const candidates: HighlightCandidate[] = [];
 
   for (const event of events) {
-    const actorName = findCharName(roster, event.actorId) ?? event.actorId;
+    const actor = roster.find((c) => c.id === event.actorId);
+    const actorName = actor?.name ?? event.actorId;
     const targetName = event.targetId
       ? resolveTargetName(event.targetId, roster, dungeon)
       : "";
@@ -48,6 +50,7 @@ export function generateHighlights(
       amount: String(event.amount ?? 0),
       encounter: encounterName,
     };
+    const points = actor ? pointsForEvent(event, actor) : 0;
 
     switch (event.kind) {
       case "crit": {
@@ -58,6 +61,7 @@ export function generateHighlights(
             actorIds: [event.actorId],
             description: fillTemplate(tmpl, vars),
             importance: "medium",
+            points,
           },
           priority: 5 + (event.amount ?? 0),
         });
@@ -73,6 +77,7 @@ export function generateHighlights(
               actorIds: [event.actorId],
               description: fillTemplate(tmpl, vars),
               importance: "high",
+              points,
             },
             priority: 100,
           });
@@ -84,6 +89,7 @@ export function generateHighlights(
               actorIds: [event.actorId],
               description: fillTemplate(tmpl, vars),
               importance: "medium",
+              points,
             },
             priority: 10,
           });
@@ -98,6 +104,7 @@ export function generateHighlights(
             actorIds: [event.actorId],
             description: fillTemplate(tmpl, vars),
             importance: "high",
+            points,
           },
           priority: 50,
         });
@@ -111,6 +118,7 @@ export function generateHighlights(
             actorIds: [event.actorId],
             description: fillTemplate(tmpl, vars),
             importance: "medium",
+            points,
           },
           priority: 20,
         });
@@ -125,6 +133,7 @@ export function generateHighlights(
               actorIds: [event.actorId],
               description: fillTemplate(tmpl, vars),
               importance: "low",
+              points,
             },
             priority: 3 + (event.amount ?? 0),
           });
@@ -139,6 +148,7 @@ export function generateHighlights(
             actorIds: [event.actorId],
             description: fillTemplate(tmpl, vars),
             importance: "medium",
+            points,
           },
           priority: 15,
         });
@@ -152,8 +162,63 @@ export function generateHighlights(
             actorIds: [event.actorId],
             description: fillTemplate(tmpl, vars),
             importance: "medium",
+            points,
           },
           priority: 12,
+        });
+        break;
+      }
+      case "revivify": {
+        const tmpl = templates.revivify[0] ?? "{actor} revived {target}!";
+        candidates.push({
+          highlight: { kind: "revivify", actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "high", points },
+          priority: 80,
+        });
+        break;
+      }
+      case "arcane_surge": {
+        const tmpl = templates.arcane_surge[0] ?? "{actor} unleashed an arcane surge!";
+        candidates.push({
+          highlight: { kind: "arcane_surge", actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "medium", points },
+          priority: 25,
+        });
+        break;
+      }
+      case "smite": {
+        if ((event.amount ?? 0) >= 6) {
+          const tmpl = templates.smite[0] ?? "{actor} smote {target}!";
+          candidates.push({
+            highlight: { kind: "smite", actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "medium", points },
+            priority: 15 + (event.amount ?? 0),
+          });
+        }
+        break;
+      }
+      case "sneak_attack": {
+        if ((event.amount ?? 0) >= 6) {
+          const tmpl = templates.sneak_attack[0] ?? "{actor} landed a sneak attack!";
+          candidates.push({
+            highlight: { kind: "sneak_attack", actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "medium", points },
+            priority: 12 + (event.amount ?? 0),
+          });
+        }
+        break;
+      }
+      case "buff": {
+        const tmpl = templates.buff[0] ?? "{actor} buffed {target}!";
+        candidates.push({
+          highlight: { kind: "buff", actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "low", points },
+          priority: 5,
+        });
+        break;
+      }
+      case "persuade":
+      case "deceive":
+      case "intimidate": {
+        const tmpl = templates[event.kind][0] ?? `{actor} prevailed.`;
+        candidates.push({
+          highlight: { kind: event.kind, actorIds: [event.actorId], description: fillTemplate(tmpl, vars), importance: "low", points },
+          priority: 8,
         });
         break;
       }

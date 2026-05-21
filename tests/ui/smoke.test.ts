@@ -56,4 +56,19 @@ describe("UI smoke tests", () => {
     expect(mod.default).toBeDefined();
     expect(mod.loader).toBeDefined();
   });
+
+  it("leagues.new form contains a preset select with all 5 options", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.resolve("app/routes/leagues.new.tsx"),
+      "utf8",
+    );
+    expect(source).toContain('name="preset"');
+    expect(source).toContain('value="standard"');
+    expect(source).toContain('value="quick"');
+    expect(source).toContain('value="epic"');
+    expect(source).toContain('value="champions"');
+    expect(source).toContain('value="veterans"');
+  });
 });

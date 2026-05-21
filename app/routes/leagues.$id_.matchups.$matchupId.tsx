@@ -48,6 +48,16 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
     return <div className="card">This matchup hasn't been played yet.</div>;
   }
 
+  const sumColumn = (perChar: any, key: string) =>
+    Object.values(perChar ?? {}).reduce((acc: number, cs: any) => acc + (cs?.[key] ?? 0), 0);
+
+  const homeBase = sumColumn(homeRun.score?.perCharacter, "basePoints");
+  const homeRolePts = sumColumn(homeRun.score?.perCharacter, "roleMultiplierPoints");
+  const homeMilestone = sumColumn(homeRun.score?.perCharacter, "milestonePoints");
+  const awayBase = sumColumn(awayRun.score?.perCharacter, "basePoints");
+  const awayRolePts = sumColumn(awayRun.score?.perCharacter, "roleMultiplierPoints");
+  const awayMilestone = sumColumn(awayRun.score?.perCharacter, "milestonePoints");
+
   const allHighlights = [
     ...(homeRun.highlights ?? []).map((h: any) => ({ ...h, _teamName: matchup.homeTeam.name })),
     ...(awayRun.highlights ?? []).map((h: any) => ({ ...h, _teamName: matchup.awayTeam.name })),
@@ -116,6 +126,17 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: "2px solid var(--ink)" }}>
+                <td colSpan={2} style={{ fontWeight: "bold", textAlign: "right" }}>Team Total</td>
+                <td style={{ fontWeight: "bold" }}>{homeBase.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold" }}>{homeRolePts.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold" }}>{homeMilestone.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold", color: matchup.winnerId === matchup.homeTeamId ? "var(--gold)" : "var(--ink)" }}>
+                  {homeRun.score?.teamTotal?.toFixed(1)}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
         <div>
@@ -136,6 +157,17 @@ export default function MatchupPage({ loaderData }: Route.ComponentProps) {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: "2px solid var(--ink)" }}>
+                <td colSpan={2} style={{ fontWeight: "bold", textAlign: "right" }}>Team Total</td>
+                <td style={{ fontWeight: "bold" }}>{awayBase.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold" }}>{awayRolePts.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold" }}>{awayMilestone.toFixed(1)}</td>
+                <td style={{ fontWeight: "bold", color: matchup.winnerId === matchup.awayTeamId ? "var(--gold)" : "var(--ink)" }}>
+                  {awayRun.score?.teamTotal?.toFixed(1)}
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
