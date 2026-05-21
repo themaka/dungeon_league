@@ -1,3 +1,10 @@
+// Tuning sandbox for leveling rules. Production rule chosen 2026-05-21:
+// Floor×3.0 + 3.5× calibration. This route stays as a lab for future
+// tuning rounds — its experimental toggles (healerMultiHeal,
+// healerHitSecondary, force-balanced lineups, playoff structure) remain
+// sandbox-only.
+// See docs/superpowers/specs/2026-05-21-leveling-rule-and-xp-scale-design.md
+
 import { Fragment, useState } from "react";
 import { Form } from "react-router";
 import { ProceduralSource } from "domain/content/procedural-source";

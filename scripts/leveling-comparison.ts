@@ -1,3 +1,8 @@
+// Rule chosen 2026-05-21: Floor×3.0 (Broadened-NoBonus + Utility floor-fix at 3.0×)
+// plus 3.5× XP_AWARD_MULTIPLIER pace calibration. The variants below
+// (Util×{1.5..4.0}, Floor×{3.0, 3.5}) are the decision audit trail.
+// See docs/superpowers/specs/2026-05-21-leveling-rule-and-xp-scale-design.md
+
 import { ProceduralSource } from "../domain/content/procedural-source";
 import { runDungeon } from "../domain/sim/sim-engine";
 import { score } from "../domain/scoring";
@@ -102,9 +107,14 @@ function xpBroadenedNoBonus(character: Character, events: SimEvent[]): number {
   return total;
 }
 
-// Same as Brd-NoBon, but Utility characters also get a 1.5× bonus on every
-// event in the Utility role set (compensates for how rarely those events fire).
-function xpBroadenedNoBonusUtilLift(character: Character, events: SimEvent[]): number {
+// Same as Brd-NoBon, but Utility characters also get a configurable bonus on
+// every event in the Utility role set (compensates for how rarely those events
+// fire). `utilMult` controls the size of that bonus.
+function xpBroadenedNoBonusUtilLift(
+  character: Character,
+  events: SimEvent[],
+  utilMult: number,
+): number {
   let total = 0;
   const roleSet = ROLE_XP_EVENTS[character.role];
   const isUtility = character.role === "Utility";
@@ -117,6 +127,35 @@ function xpBroadenedNoBonusUtilLift(character: Character, events: SimEvent[]): n
     if (isRoleEvent && isSpecialtyCore) {
       amount = Math.round(amount * SPECIALTY_XP_BONUS);
     } else if (isUtility && isRoleEvent) {
+      amount = Math.round(amount * utilMult);
+    }
+    total += amount;
+  }
+  return total;
+}
+
+// Floor-fix variant: like UtilLift, but for Utility role events use
+// max(specialtyBonus, utilMult) so that Utility specialty-core events get the
+// utility lift too. Fixes the Thief floor (Thief's specialty events ARE
+// Utility role events, so the regular lift bypasses them).
+function xpUtilLiftFloorFix(
+  character: Character,
+  events: SimEvent[],
+  utilMult: number,
+): number {
+  let total = 0;
+  const roleSet = ROLE_XP_EVENTS[character.role];
+  const isUtility = character.role === "Utility";
+  for (const event of events) {
+    if (event.actorId !== character.id) continue;
+    const isRoleEvent = roleSet.has(event.kind);
+    const isSpecialtyCore = isCoreEventForSpecialty(character.specialty, event.kind);
+    if (!isRoleEvent && !isSpecialtyCore) continue;
+    let amount = xpAmountForEvent(event);
+    if (isUtility && isRoleEvent) {
+      const mult = Math.max(SPECIALTY_XP_BONUS, utilMult);
+      amount = Math.round(amount * mult);
+    } else if (isRoleEvent && isSpecialtyCore) {
       amount = Math.round(amount * SPECIALTY_XP_BONUS);
     }
     total += amount;
@@ -141,7 +180,15 @@ interface CharResult {
   xpCurrent: number;
   xpBroadened: number;
   xpBroadenedNoBonus: number;
-  xpBroadenedNoBonusUtil: number;
+  xpBroadenedNoBonusUtil15: number;
+  xpBroadenedNoBonusUtil175: number;
+  xpBroadenedNoBonusUtil20: number;
+  xpBroadenedNoBonusUtil25: number;
+  xpBroadenedNoBonusUtil30: number;
+  xpBroadenedNoBonusUtil35: number;
+  xpBroadenedNoBonusUtil40: number;
+  xpUtilFloorFix30: number;
+  xpUtilFloorFix35: number;
   xpMilestone: number;
 }
 
@@ -216,7 +263,15 @@ function main() {
           xpCurrent: 0,
           xpBroadened: 0,
           xpBroadenedNoBonus: 0,
-          xpBroadenedNoBonusUtil: 0,
+          xpBroadenedNoBonusUtil15: 0,
+          xpBroadenedNoBonusUtil175: 0,
+          xpBroadenedNoBonusUtil20: 0,
+          xpBroadenedNoBonusUtil25: 0,
+          xpBroadenedNoBonusUtil30: 0,
+          xpBroadenedNoBonusUtil35: 0,
+          xpBroadenedNoBonusUtil40: 0,
+          xpUtilFloorFix30: 0,
+          xpUtilFloorFix35: 0,
           xpMilestone: 0,
         });
       }
@@ -255,7 +310,15 @@ function main() {
           r.xpCurrent += xpCurrent(ch, events);
           r.xpBroadened += xpBroadened(ch, events);
           r.xpBroadenedNoBonus += xpBroadenedNoBonus(ch, events);
-          r.xpBroadenedNoBonusUtil += xpBroadenedNoBonusUtilLift(ch, events);
+          r.xpBroadenedNoBonusUtil15 += xpBroadenedNoBonusUtilLift(ch, events, 1.5);
+          r.xpBroadenedNoBonusUtil175 += xpBroadenedNoBonusUtilLift(ch, events, 1.75);
+          r.xpBroadenedNoBonusUtil20 += xpBroadenedNoBonusUtilLift(ch, events, 2.0);
+          r.xpBroadenedNoBonusUtil25 += xpBroadenedNoBonusUtilLift(ch, events, 2.5);
+          r.xpBroadenedNoBonusUtil30 += xpBroadenedNoBonusUtilLift(ch, events, 3.0);
+          r.xpBroadenedNoBonusUtil35 += xpBroadenedNoBonusUtilLift(ch, events, 3.5);
+          r.xpBroadenedNoBonusUtil40 += xpBroadenedNoBonusUtilLift(ch, events, 4.0);
+          r.xpUtilFloorFix30 += xpUtilLiftFloorFix(ch, events, 3.0);
+          r.xpUtilFloorFix35 += xpUtilLiftFloorFix(ch, events, 3.5);
         }
       }
     };
@@ -288,7 +351,15 @@ function main() {
     { name: "Current", get: (r: CharResult) => r.xpCurrent },
     { name: "Broadened", get: (r: CharResult) => r.xpBroadened },
     { name: "Brd-NoBon", get: (r: CharResult) => r.xpBroadenedNoBonus },
-    { name: "NoBon+Util", get: (r: CharResult) => r.xpBroadenedNoBonusUtil },
+    { name: "Util×1.5", get: (r: CharResult) => r.xpBroadenedNoBonusUtil15 },
+    { name: "Util×1.75", get: (r: CharResult) => r.xpBroadenedNoBonusUtil175 },
+    { name: "Util×2.0", get: (r: CharResult) => r.xpBroadenedNoBonusUtil20 },
+    { name: "Util×2.5", get: (r: CharResult) => r.xpBroadenedNoBonusUtil25 },
+    { name: "Util×3.0", get: (r: CharResult) => r.xpBroadenedNoBonusUtil30 },
+    { name: "Util×3.5", get: (r: CharResult) => r.xpBroadenedNoBonusUtil35 },
+    { name: "Util×4.0", get: (r: CharResult) => r.xpBroadenedNoBonusUtil40 },
+    { name: "Floor×3.0", get: (r: CharResult) => r.xpUtilFloorFix30 },
+    { name: "Floor×3.5", get: (r: CharResult) => r.xpUtilFloorFix35 },
     { name: "Milestone", get: (r: CharResult) => r.xpMilestone },
   ];
 
@@ -307,6 +378,14 @@ function main() {
   for (const m of modes) {
     const xs = allResults.map(m.get);
     console.log(`${m.name.padEnd(10)} r=${pearson(pts, xs).toFixed(3)}`);
+  }
+
+  console.log("\n--- Mean XP per matchup (for calibration) ---");
+  const totalMatchups = allResults.reduce((a, r) => a + r.matchupsPlayed, 0);
+  for (const m of modes) {
+    const totalXp = allResults.reduce((a, r) => a + m.get(r), 0);
+    const xpPerMatchup = totalXp / totalMatchups;
+    console.log(`${m.name.padEnd(10)} ${xpPerMatchup.toFixed(2).padStart(6)} XP/matchup`);
   }
 
   console.log("\n--- Per-role mean XP ---");
@@ -352,18 +431,27 @@ function main() {
     );
   }
 
-  console.log("\n--- Utility characters (impact of NoBon+Util) ---");
+  console.log("\n--- Utility characters: XP at each multiplier ---");
   const utilityChars = allResults
     .filter((r) => r.role === "Utility")
     .sort((a, b) => b.totalPoints - a.totalPoints)
     .slice(0, 8);
-  console.log("class · specialty : pts | cur/noBon/noBon+Util | curL/noBonL/noBonUtilL");
+  console.log("class · specialty : pts | cur / ×2.5 / ×3.0 / ×3.5 / ×4.0 / Floor×3.0 / Floor×3.5 | levels");
   for (const r of utilityChars) {
     const cL = levelFor(r.xpCurrent, scaleFactor);
-    const nL = levelFor(r.xpBroadenedNoBonus, scaleFactor);
-    const uL = levelFor(r.xpBroadenedNoBonusUtil, scaleFactor);
+    const u25 = levelFor(r.xpBroadenedNoBonusUtil25, scaleFactor);
+    const u30 = levelFor(r.xpBroadenedNoBonusUtil30, scaleFactor);
+    const u35 = levelFor(r.xpBroadenedNoBonusUtil35, scaleFactor);
+    const u40 = levelFor(r.xpBroadenedNoBonusUtil40, scaleFactor);
+    const f30 = levelFor(r.xpUtilFloorFix30, scaleFactor);
+    const f35 = levelFor(r.xpUtilFloorFix35, scaleFactor);
     console.log(
-      `${r.className.padEnd(11)} ${r.specialty.padEnd(15)} : ${r.totalPoints.toFixed(0).padStart(4)} | ${r.xpCurrent.toString().padStart(3)}/${r.xpBroadenedNoBonus.toString().padStart(3)}/${r.xpBroadenedNoBonusUtil.toString().padStart(3)} | L${cL}/L${nL}/L${uL}`,
+      `${r.className.padEnd(11)} ${r.specialty.padEnd(15)} : ${r.totalPoints.toFixed(0).padStart(4)} | ` +
+      `${r.xpCurrent.toString().padStart(3)} / ${r.xpBroadenedNoBonusUtil25.toString().padStart(3)} / ` +
+      `${r.xpBroadenedNoBonusUtil30.toString().padStart(3)} / ${r.xpBroadenedNoBonusUtil35.toString().padStart(3)} / ` +
+      `${r.xpBroadenedNoBonusUtil40.toString().padStart(3)} / ` +
+      `${r.xpUtilFloorFix30.toString().padStart(3)} / ${r.xpUtilFloorFix35.toString().padStart(3)} | ` +
+      `L${cL}/L${u25}/L${u30}/L${u35}/L${u40}/L${f30}/L${f35}`,
     );
   }
 }
