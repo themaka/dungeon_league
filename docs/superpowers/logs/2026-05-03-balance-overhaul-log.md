@@ -151,11 +151,12 @@ The sandbox has grown several additional knobs as playtesting surfaced more ques
 
 Before merging, recommend:
 
-1. `npx prisma db push` against your dev Postgres to apply the schema changes.
-2. `npm test -- tests/services/` — service tests should now pass with a real DB.
-3. `npm run dev`; create a Champions league and try a draft to confirm 72 characters appear, all level 20 with all 8 ability tiers showing on cards.
-4. Try a Quick Play league; advance through 5 weeks; confirm characters gain XP and level up between matchups.
-5. Watch a matchup play-by-play; confirm new event icons render (smite, sneak_attack, multiattack, revivify especially).
+1. `npx prisma db push` against your dev Postgres to apply the schema changes. If existing rows block the push (the required `specialty` column can't backfill), use `--force-reset` to drop & recreate — dev data is lost.
+2. `npx prisma generate` — **required after `db push`.** `db push` does NOT regenerate the client; a stale client fails with `Unknown argument scoutingReports` even though the DB column exists. (Verified 2026-06-17: this was the actual blocker on the service tests, not the schema.)
+3. `npm test -- tests/services/` — service tests should now pass with a real DB.
+4. `npm run dev`; create a Champions league and try a draft to confirm 72 characters appear, all level 20 with all 8 ability tiers showing on cards.
+5. Try a Quick Play league; advance through 5 weeks; confirm characters gain XP and level up between matchups.
+6. Watch a matchup play-by-play; confirm new event icons render (smite, sneak_attack, multiattack, revivify especially).
 
 ## Manual-Testing Phase Fixes (Post-Merge-Candidate)
 
